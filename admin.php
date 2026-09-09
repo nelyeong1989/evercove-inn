@@ -1,0 +1,282 @@
+<?php
+session_start();
+require 'database/config.php';
+
+// Check if user is logged in as an admin
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+    header('Location: login.php?status=error&message=' . urlencode('Administrator privileges required. Please sign in as staff.'));
+    exit;
+}
+
+$status  = $_GET['status'] ?? null;
+$message = $_GET['message'] ?? null;
+
+$pdo = getConnection();
+
+// 1. Fetch dashboard overview stats
+$revStmt = $pdo->query("SELECT COALESCE(SUM(total_amount), 0) AS total_rev FROM bookings WHERE status = 'confirmed'");
+$totalRevenue = (float)$revStmt->fetchColumn();
+
+$activeStmt = $pdo->query("SELECT COUNT(*) FROM bookings WHERE status = 'confirmed' AND CURRENT_DATE BETWEEN checkin_date AND checkout_date");
+$activeStays = (int)$activeStmt->fetchColumn();
+
+$confirmedCountStmt = $pdo->query("SELECT COUNT(*) FROM bookings WHERE status = 'confirmed'");
+$totalBookings = (int)$confirmedCountStmt->fetchColumn();
+
+$ratingStmt = $pdo->query("SELECT AVG(rating) AS avg_score, COUNT(*) AS count FROM reviews");
+$ratingData = $ratingStmt->fetch();
+$avgRating = ($ratingData && $ratingData['count'] > 0) ? number_format((float)$ratingData['avg_score'], 1) : '5.0';
+
+// 2. Fetch users, rooms, bookings, and reviews
+$users = $pdo->query("SELECT id, username, email, role, created_at FROM users ORDER BY id ASC")->fetchAll();
+$rooms = $pdo->query("SELECT * FROM rooms ORDER BY id ASC")->fetchAll();
+$bookings = $pdo->query("
+    SELECT b.*, r.name AS room_name 
+    FROM bookings b 
+    JOIN rooms r ON b.room_id = r.id 
+    ORDER BY b.id DESC
+")->fetchAll();
+$reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Management Portal — Evercove</title>
+  <link rel="stylesheet" href="style.css?v=<?php echo time(); ?>">
+</head>
+<body>
+
+<div class="admin-wrap">
+
+  <?php if ($status && $message): ?>
+    <div class="system-alert <?= $status === 'success' ? 'alert-success' : 'alert-error' ?>" id="alert-banner">
+      <span><?= htmlspecialchars($message) ?></span>
+      <button type="button" class="alert-close" onclick="dismissAlert()">&times;</button>
+    </div>
+  <?php endif; ?>
+
+  <!-- Admin Top Header -->
+  <div class="admin-header">
+    <div>
+      <span class="eyebrow">Executive Console</span>
+      <h2 style="color: var(--emerald-green); margin-top: 0.2rem;">Evercove Hotel Operations</h2>
+    </div>
+    <div class="user-badge">
+      <a href="index.php" class="btn btn-green btn-sm">View Website</a>
+      <a href="function.php?action=logout" class="btn btn-sage btn-sm">Sign Out</a>
+    </div>
+  </div>
+
+  <!-- Metric Overview Cards -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <span class="kpi-label">Gross Revenue</span>
+      <div class="kpi-number">&#8369;<?= number_format($totalRevenue, 2) ?></div>
+      <small>Confirmed reservations</small>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">Active In-House Stays</span>
+      <div class="kpi-number"><?= $activeStays ?></div>
+      <small>Currently checked in</small>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">Confirmed Bookings</span>
+      <div class="kpi-number"><?= $totalBookings ?></div>
+      <small>All-time total</small>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">Guest Satisfaction</span>
+      <div class="kpi-number"><?= $avgRating ?> / 5.0</div>
+      <small><?= (int)($ratingData['count'] ?? 0) ?> verified reviews</small>
+    </div>
+  </div>
+
+  <!-- Reservations Header with Instant Search Bar -->
+  <div class="admin-section-head">
+    <div>
+      <h3 style="color: var(--emerald-green);">Guest Reservations</h3>
+      <p style="color: var(--gray); font-size: 0.85rem;">Manage upcoming arrivals, guest cancellations, and stay records.</p>
+    </div>
+    <div class="admin-toolbar">
+      <input type="text" id="bookingSearch" class="admin-search-input" placeholder="Search reference or guest..." onkeyup="filterBookingsTable()">
+    </div>
+  </div>
+
+  <?php if (empty($bookings)): ?>
+    <p style="font-size: 0.85rem; color: var(--gray); margin-bottom: 2rem;">No reservations yet.</p>
+  <?php else: ?>
+    <table class="admin-table" id="bookingsTable">
+      <thead>
+        <tr>
+          <th>Ref</th>
+          <th>Guest</th>
+          <th>Room</th>
+          <th>Dates</th>
+          <th>Party</th>
+          <th>Total</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($bookings as $b): ?>
+          <tr>
+            <td><strong>#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?></strong></td>
+            <td><?= htmlspecialchars($b['guest_name']) ?><br><small><?= htmlspecialchars($b['guest_email']) ?></small></td>
+            <td><strong><?= htmlspecialchars($b['room_name']) ?></strong></td>
+            <td><?= htmlspecialchars($b['checkin_date']) ?> to <?= htmlspecialchars($b['checkout_date']) ?></td>
+            <td><?= htmlspecialchars($b['guests_count']) ?></td>
+            <td><strong>&#8369;<?= number_format($b['total_amount'], 2) ?></strong></td>
+            <td>
+              <span class="badge <?= $b['status'] === 'confirmed' ? 'badge-confirmed' : 'badge-cancelled' ?>">
+                <?= htmlspecialchars($b['status']) ?>
+              </span>
+            </td>
+            <td>
+              <?php if ($b['status'] === 'confirmed'): ?>
+                <a href="function.php?action=cancel-booking&id=<?= $b['id'] ?>" 
+                   class="btn-action-cancel" 
+                   onclick="return confirm('Cancel this reservation? This reopens the dates immediately.');">
+                  Cancel
+                </a>
+              <?php else: ?>
+                <span style="color: var(--gray); font-size: 0.75rem;">None</span>
+              <?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  <?php endif; ?>
+
+  <!-- Room Rates Management -->
+  <h3 style="color: var(--emerald-green); margin-bottom: 0.8rem; margin-top: 2rem;">Room Rates &amp; Catalog Management</h3>
+  <table class="admin-table">
+    <thead>
+      <tr>
+        <th>Room Name</th>
+        <th>Category</th>
+        <th>Current Rate / Night</th>
+        <th>Update Rate</th>
+      </tr>
+    </thead>
+    <tbody>
+      <?php foreach ($rooms as $room): ?>
+        <tr>
+          <td><strong><?= htmlspecialchars($room['name']) ?></strong></td>
+          <td><?= htmlspecialchars($room['category']) ?></td>
+          <td><strong>&#8369;<?= number_format($room['price_per_night'], 2) ?></strong></td>
+          <td>
+            <form method="POST" action="function.php" style="display: flex; gap: 0.5rem; align-items: center;">
+              <input type="hidden" name="room_id" value="<?= $room['id'] ?>">
+              <input type="number" step="50" min="500" name="price_per_night" value="<?= (int)$room['price_per_night'] ?>" class="rate-inline-input" required>
+              <button type="submit" name="update-room-rate" class="btn btn-green btn-sm" style="padding: 0.4rem 0.8rem;">Save</button>
+            </form>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+
+  <!-- Registered User Accounts -->
+  <h3 style="color: var(--emerald-green); margin-bottom: 0.8rem; margin-top: 2rem;">Registered Accounts</h3>
+  <table class="admin-table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Created</th>
+      </tr>
+    </thead>
+    <tbody>
+      <?php foreach ($users as $u): ?>
+        <tr>
+          <td><?= htmlspecialchars($u['id']) ?></td>
+          <td><strong><?= htmlspecialchars($u['username']) ?></strong></td>
+          <td><?= htmlspecialchars($u['email']) ?></td>
+          <td>
+            <span class="badge <?= $u['role'] === 'admin' ? 'badge-admin' : 'badge-user' ?>">
+              <?= htmlspecialchars($u['role']) ?>
+            </span>
+          </td>
+          <td><?= htmlspecialchars($u['created_at']) ?></td>
+        </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+
+  <!-- Guest Reviews Moderation -->
+  <h3 style="color: var(--emerald-green); margin-bottom: 0.8rem; margin-top: 2rem;">Guest Feedback Moderation</h3>
+  <?php if (empty($reviews)): ?>
+    <p style="font-size: 0.85rem; color: var(--gray);">No guest reviews recorded yet.</p>
+  <?php else: ?>
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Attribution</th>
+          <th>Room Stayed</th>
+          <th>Rating</th>
+          <th>Feedback</th>
+          <th>Date</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($reviews as $rev): ?>
+          <tr>
+            <td><strong><?= htmlspecialchars($rev['guest_name']) ?></strong></td>
+            <td><?= htmlspecialchars($rev['room_type']) ?></td>
+            <td><?= htmlspecialchars($rev['rating']) ?> / 5 &#9733;</td>
+            <td><?= htmlspecialchars($rev['comment']) ?></td>
+            <td><?= htmlspecialchars($rev['created_at']) ?></td>
+            <td>
+              <a href="function.php?action=delete-review&id=<?= $rev['id'] ?>" 
+                 class="btn-action-cancel" 
+                 onclick="return confirm('Permanently remove this review from the public website?');">
+                Delete
+              </a>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  <?php endif; ?>
+
+</div>
+
+<script>
+  function filterBookingsTable() {
+    const input = document.getElementById('bookingSearch');
+    const filter = input.value.toLowerCase();
+    const table = document.getElementById('bookingsTable');
+    if (!table) return;
+
+    const tr = table.getElementsByTagName('tr');
+    for (let i = 1; i < tr.length; i++) {
+      const rowText = tr[i].textContent || tr[i].innerText;
+      tr[i].style.display = rowText.toLowerCase().indexOf(filter) > -1 ? '' : 'none';
+    }
+  }
+
+  function dismissAlert() {
+    const alert = document.getElementById('alert-banner');
+    if (alert) alert.style.display = 'none';
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const alert = document.getElementById('alert-banner');
+    if (alert) {
+      setTimeout(dismissAlert, 4000);
+      if (window.history.replaceState) {
+        const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+        window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
+      }
+    }
+  });
+</script>
+
+</body>
+</html>
