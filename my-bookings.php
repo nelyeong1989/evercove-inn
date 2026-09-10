@@ -107,7 +107,10 @@ try {
               <?= htmlspecialchars($b['room_name']) ?><br>
               <small style="color: var(--gray);"><?= htmlspecialchars($b['category']) ?></small>
             </td>
-            <td><?= htmlspecialchars($b['checkin_date']) ?> &rarr; <?= htmlspecialchars($b['checkout_date']) ?></td>
+            <td>
+              <?= date('M j, Y', strtotime($b['checkin_date'])) ?> &rarr; 
+              <?= date('M j, Y', strtotime($b['checkout_date'])) ?>
+            </td>
             <td><?= htmlspecialchars($b['guests_count']) ?></td>
             <td><strong>₱<?= number_format($b['total_amount'], 2) ?></strong></td>
             <td>
