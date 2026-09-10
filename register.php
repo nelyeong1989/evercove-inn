@@ -46,6 +46,10 @@ if (isset($_SESSION['user_id'])) {
       <label for="password">Password (min. 6 characters)</label>
       <input type="password" id="password" name="password" required>
     </div>
+    <div class="form-group">
+      <label for="confirm_password">Confirm Password</label>
+      <input type="password" id="confirm_password" name="confirm_password" required>
+    </div>
     <button type="submit" name="register-user" class="btn btn-gold" style="width: 100%; margin-top: 0.5rem;">Register</button>
   </form>
 

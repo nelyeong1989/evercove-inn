@@ -39,12 +39,13 @@ function validateIntRange(string $value, string $label, int $min, int $max): ?st
     return $ok !== false ? null : "$label must be a whole number between $min and $max.";
 }
 
-// Validate registration inputs
+// Validate registration inputs with confirmation check
 function validateRegisterInput(array $post): array
 {
     $username = trim($post['username'] ?? '');
     $email    = trim($post['email'] ?? '');
     $password = $post['password'] ?? '';
+    $confirm  = $post['confirm_password'] ?? '';
 
     $errors = array_filter([
         validateRequired($username, 'Username'),
@@ -53,6 +54,7 @@ function validateRegisterInput(array $post): array
         validateEmailFormat($email),
         validateRequired($password, 'Password'),
         validateMinLength($password, 'Password', 6),
+        ($password !== $confirm) ? "Passwords do not match." : null,
     ]);
 
     return [
