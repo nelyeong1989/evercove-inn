@@ -2,6 +2,9 @@
 session_start();
 require_once 'database/config.php';
 
+$status  = $_GET['status'] ?? null;
+$message = $_GET['message'] ?? null;
+
 try {
     $pdo = getConnection();
     $stmt = $pdo->query("SELECT * FROM rooms ORDER BY id ASC");
@@ -10,7 +13,7 @@ try {
     $rooms = [];
 }
 
-// 4 simple perks per room category
+// room inclusions
 function getRoomInclusions(string $category): array {
     switch (trim($category)) {
         case 'Single Room':
@@ -48,6 +51,13 @@ function getRoomInclusions(string $category): array {
   <link rel="stylesheet" href="style.css?v=<?php echo time(); ?>">
 </head>
 <body>
+
+<?php if ($status && $message): ?>
+  <div class="system-alert <?= $status === 'success' ? 'alert-success' : 'alert-error' ?>" id="alert-banner">
+    <span><?= htmlspecialchars($message) ?></span>
+    <button type="button" class="alert-close" onclick="dismissAlert()">&times;</button>
+  </div>
+<?php endif; ?>
 
 <!-- Header Navigation -->
 <header class="site-header">
@@ -175,6 +185,22 @@ function getRoomInclusions(string $category): array {
       targetSheet.classList.toggle('active');
     }
   }
+
+  function dismissAlert() {
+    const alert = document.getElementById('alert-banner');
+    if (alert) alert.style.display = 'none';
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const alert = document.getElementById('alert-banner');
+    if (alert) {
+      setTimeout(dismissAlert, 4000);
+      if (window.history.replaceState) {
+        const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+        window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
+      }
+    }
+  });
 </script>
 
 </body>
