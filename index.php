@@ -129,7 +129,7 @@ $message = $_GET['message'] ?? null;
     <span class="eyebrow">Book Direct</span>
     <h3>Reserve Your Room</h3>
     <p>Best rate guaranteed when you book directly with us — no middlemen, no markup.</p>
-    <a href="booking.php" class="btn btn-gold">View Rooms</a>
+    <a href="rooms.php" class="btn btn-gold">View Rooms</a>
   </div>
 </div>
 
