@@ -108,7 +108,7 @@ $message = $_GET['message'] ?? null;
     <span class="eyebrow">Ready When You Are</span>
     <h2>A weekend away is closer than it feels.</h2>
     <p>Two nights, no plans required. Just a fire, good company, and the woods.</p>
-    <a href="rooms.php" class="btn btn-gold">View Rooms</a>
+    <a href="booking.php" class="btn btn-gold">Check Availability</a>
   </div>
 </section>
 
