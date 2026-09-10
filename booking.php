@@ -9,7 +9,7 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// Admins cannot make guest bookings
+// Admin cannot make guest bookings
 if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
     header('Location: admin.php?status=error&message=' . urlencode('Administrator accounts cannot make room reservations. Please sign in with a guest account.'));
     exit;
@@ -38,6 +38,57 @@ try {
   <meta charset="UTF-8">
   <title>Reserve Your Stay — Evercove Inn & Suites</title>
   <link rel="stylesheet" href="style.css?v=<?php echo time(); ?>">
+  <style>
+    .payment-option-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.8rem;
+      margin-top: 0.4rem;
+    }
+    .payment-card {
+      border: 1.5px solid rgba(188, 148, 86, 0.35);
+      border-radius: 8px;
+      padding: 0.9rem;
+      text-align: center;
+      background: #ffffff;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .payment-card:hover {
+      border-color: var(--emerald-green);
+    }
+    .payment-card.active {
+      border-color: var(--emerald-green);
+      background: rgba(39, 77, 58, 0.06);
+      box-shadow: 0 0 0 2px var(--emerald-green);
+    }
+    .payment-card input[type="radio"] {
+      display: none;
+    }
+    .payment-icon {
+      font-size: 1.3rem;
+      margin-bottom: 0.2rem;
+    }
+    .payment-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--emerald-green);
+    }
+    .payment-sub {
+      font-size: 0.68rem;
+      color: var(--gray);
+      margin-top: 0.15rem;
+    }
+    .payment-instructions {
+      background: #fbf5ee;
+      border: 1px dashed rgba(188, 148, 86, 0.5);
+      border-radius: 6px;
+      padding: 0.85rem 1rem;
+      font-size: 0.8rem;
+      color: var(--charcoal);
+      margin-top: 0.8rem;
+    }
+  </style>
 </head>
 <body>
 
@@ -74,7 +125,7 @@ try {
     <div style="text-align: center; margin-bottom: 2rem;">
       <span class="eyebrow eyebrow-green">Direct Reservation</span>
       <h2 style="color: var(--emerald-green); font-size: 2.2rem; margin-top: 0.3rem;">Find Your Haven in the Hills</h2>
-      <p style="color: var(--gray); font-size: 0.95rem; margin-top: 0.4rem;">Select your preferred dates and room below to secure your stay.</p>
+      <p style="color: var(--gray); font-size: 0.95rem; margin-top: 0.4rem;">Select your preferred dates, room, and payment method below.</p>
     </div>
 
     <form method="POST" action="function.php">
@@ -107,6 +158,37 @@ try {
           <label for="guests" id="guest-label">Number of Guests</label>
           <input type="number" id="guests" name="guests" value="<?= $guestsParam ?: 2 ?>" min="1" max="6" required>
         </div>
+
+        <!-- Payment Method Selector -->
+        <div class="booking-input-group full-width">
+          <label>Select Payment Option</label>
+          <div class="payment-option-grid">
+            <label class="payment-card active" onclick="selectPayment(this, 'checkin')">
+              <input type="radio" name="payment_method" value="Pay on Check-in" checked>
+              <div class="payment-icon">🏨</div>
+              <div class="payment-title">Pay on Check-in</div>
+              <div class="payment-sub">Cash / Card at desk</div>
+            </label>
+
+            <label class="payment-card" onclick="selectPayment(this, 'gcash')">
+              <input type="radio" name="payment_method" value="GCash (Online)">
+              <div class="payment-icon">📱</div>
+              <div class="payment-title">GCash</div>
+              <div class="payment-sub">Instant e-Wallet</div>
+            </label>
+
+            <label class="payment-card" onclick="selectPayment(this, 'card')">
+              <input type="radio" name="payment_method" value="Card (Online)">
+              <div class="payment-icon">💳</div>
+              <div class="payment-title">Credit / Debit</div>
+              <div class="payment-sub">Visa / Mastercard</div>
+            </label>
+          </div>
+
+          <div class="payment-instructions" id="payment-note">
+            Settle your bill directly at our Valencia front desk when you arrive. No advance payment required today.
+          </div>
+        </div>
       </div>
 
       <div class="booking-info-banner">
@@ -134,6 +216,21 @@ try {
 </footer>
 
 <script>
+  function selectPayment(cardElement, mode) {
+    document.querySelectorAll('.payment-card').forEach(c => c.classList.remove('active'));
+    cardElement.classList.add('active');
+    cardElement.querySelector('input[type="radio"]').checked = true;
+
+    const note = document.getElementById('payment-note');
+    if (mode === 'checkin') {
+      note.textContent = "Settle your bill directly at our Valencia front desk when you arrive. No advance payment required today.";
+    } else if (mode === 'gcash') {
+      note.innerHTML = "<strong>GCash Online:</strong> Reservation will be marked <strong>Paid (Online)</strong>. Simulated transaction reference: <code>#GC-" + Math.floor(100000 + Math.random() * 900000) + "</code>.";
+    } else if (mode === 'card') {
+      note.innerHTML = "<strong>Card Online:</strong> Secured via encrypted mock gateway. Reservation will be confirmed as <strong>Paid (Online)</strong> immediately.";
+    }
+  }
+
   function updateGuestLimit() {
     const roomSelect = document.getElementById('room_id');
     const guestInput = document.getElementById('guests');

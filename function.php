@@ -171,19 +171,27 @@ if (isset($_POST['book-stay'])) {
         $total  = $nights * (float) $room['price_per_night'];
         $userId = $_SESSION['user_id'];
 
+        // Determine payment method and payment status
+        $rawPayment = trim($_POST['payment_method'] ?? 'Pay on Check-in');
+        $validMethods = ['Pay on Check-in', 'GCash (Online)', 'Card (Online)'];
+        $paymentMethod = in_array($rawPayment, $validMethods, true) ? $rawPayment : 'Pay on Check-in';
+        $paymentStatus = ($paymentMethod === 'Pay on Check-in') ? 'Pending (Due at Check-in)' : 'Paid (Online)';
+
         $stmt = $pdo->prepare("
-            INSERT INTO bookings (user_id, room_id, guest_name, guest_email, checkin_date, checkout_date, guests_count, total_amount, status) 
-            VALUES (:uid, :rid, :name, :email, :cin, :cout, :guests, :total, 'confirmed')
+            INSERT INTO bookings (user_id, room_id, guest_name, guest_email, checkin_date, checkout_date, guests_count, total_amount, payment_method, payment_status, status) 
+            VALUES (:uid, :rid, :name, :email, :cin, :cout, :guests, :total, :pay_method, :pay_status, 'confirmed')
         ");
         $stmt->execute([
-            ':uid'    => $userId,
-            ':rid'    => $result['data']['room_id'],
-            ':name'   => $_SESSION['username'],
-            ':email'  => $_SESSION['email'],
-            ':cin'    => $result['data']['checkin'],
-            ':cout'   => $result['data']['checkout'],
-            ':guests' => $result['data']['guests'],
-            ':total'  => $total,
+            ':uid'        => $userId,
+            ':rid'        => $result['data']['room_id'],
+            ':name'       => $_SESSION['username'],
+            ':email'      => $_SESSION['email'],
+            ':cin'        => $result['data']['checkin'],
+            ':cout'       => $result['data']['checkout'],
+            ':guests'     => $result['data']['guests'],
+            ':total'      => $total,
+            ':pay_method' => $paymentMethod,
+            ':pay_status' => $paymentStatus,
         ]);
 
         $bookingId = $pdo->lastInsertId();
@@ -359,7 +367,33 @@ if (isset($_GET['action']) && $_GET['action'] === 'cancel-booking') {
     exit;
 }
 
-// 8. Admin Updates Room Price
+// 8. Admin Confirms In-Person Payment
+if (isset($_GET['action']) && $_GET['action'] === 'confirm-payment') {
+    if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+        header('Location: login.php?status=error&message=' . urlencode('Unauthorized access.'));
+        exit;
+    }
+
+    $bookingId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+    if ($bookingId) {
+        try {
+            $pdo = getConnection();
+            $stmt = $pdo->prepare("UPDATE bookings SET payment_status = 'Paid (Front Desk)' WHERE id = :id AND status = 'confirmed'");
+            $stmt->execute([':id' => $bookingId]);
+
+            header('Location: admin.php?status=success&message=' . urlencode('Payment confirmed for booking #EVR-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT) . '.'));
+            exit;
+        } catch (PDOException $e) {
+            header('Location: admin.php?status=error&message=' . urlencode($e->getMessage()));
+            exit;
+        }
+    }
+
+    header('Location: admin.php');
+    exit;
+}
+
+// 9. Admin Updates Room Price
 if (isset($_POST['update-room-rate'])) {
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
         header('Location: login.php');
@@ -387,7 +421,7 @@ if (isset($_POST['update-room-rate'])) {
     exit;
 }
 
-// 9. Admin Moderation: Remove Review
+// 10. Admin Moderation: Remove Review
 if (isset($_GET['action']) && $_GET['action'] === 'delete-review') {
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
         header('Location: login.php');
@@ -413,7 +447,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete-review') {
     exit;
 }
 
-// 10. Post Anonymous Review (Guests only)
+// 11. Post Anonymous Review (Guests only)
 if (isset($_POST['submit-review'])) {
     if (!isset($_SESSION['user_id'])) {
         header('Location: login.php?status=error&message=' . urlencode('Please sign in to leave a review.'));
@@ -452,7 +486,7 @@ if (isset($_POST['submit-review'])) {
     }
 }
 
-// 11. Newsletter Subscription
+// 12. Newsletter Subscription
 if (isset($_POST['newsletter-submit'])) {
     $email = trim($_POST['subscriber_email'] ?? '');
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -464,7 +498,7 @@ if (isset($_POST['newsletter-submit'])) {
     exit;
 }
 
-// 12. Sign Out
+// 13. Sign Out
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     session_unset();
     session_destroy();

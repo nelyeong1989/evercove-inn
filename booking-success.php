@@ -29,6 +29,9 @@ if (!$booking || ($booking['user_id'] != $_SESSION['user_id'] && $_SESSION['role
     header('Location: my-bookings.php?status=error&message=' . urlencode('Reservation receipt not found or access denied.'));
     exit;
 }
+
+$payStatus = $booking['payment_status'] ?? 'Pending (Due at Check-in)';
+$isOnlinePaid = (strpos($payStatus, 'Paid') !== false);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -65,6 +68,18 @@ if (!$booking || ($booking['user_id'] != $_SESSION['user_id'] && $_SESSION['role
     <tr>
       <th>Guests</th>
       <td><?= htmlspecialchars($booking['guests_count']) ?> Guest(s)</td>
+    </tr>
+    <tr>
+      <th>Payment Method</th>
+      <td><?= htmlspecialchars($booking['payment_method'] ?? 'Pay on Check-in') ?></td>
+    </tr>
+    <tr>
+      <th>Payment Status</th>
+      <td>
+        <span class="badge" style="background: <?= $isOnlinePaid ? 'var(--forest-green)' : 'var(--warm-gold)' ?>; color: #fff;">
+          <?= htmlspecialchars($payStatus) ?>
+        </span>
+      </td>
     </tr>
     <tr>
       <th>Total Amount Due</th>

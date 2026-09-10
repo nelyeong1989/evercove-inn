@@ -96,7 +96,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
   <div class="admin-section-head">
     <div>
       <h3 style="color: var(--emerald-green);">Guest Reservations</h3>
-      <p style="color: var(--gray); font-size: 0.85rem;">Manage upcoming arrivals, guest cancellations, and stay records.</p>
+      <p style="color: var(--gray); font-size: 0.85rem;">Manage upcoming arrivals, guest cancellations, and payment settlements.</p>
     </div>
     <div class="admin-toolbar">
       <input type="text" id="bookingSearch" class="admin-search-input" placeholder="Search reference or guest..." onkeyup="filterBookingsTable()">
@@ -113,10 +113,10 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
           <th>Guest</th>
           <th>Room</th>
           <th>Dates</th>
-          <th>Party</th>
           <th>Total</th>
+          <th>Payment</th>
           <th>Status</th>
-          <th>Action</th>
+          <th style="text-align: right;">Action</th>
         </tr>
       </thead>
       <tbody>
@@ -124,14 +124,21 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
           <?php 
             $today = date('Y-m-d');
             $isPastStay = ($b['checkout_date'] < $today);
+            $payStatus = $b['payment_status'] ?? 'Pending (Due at Check-in)';
+            $isPaid = (strpos($payStatus, 'Paid') !== false);
           ?>
           <tr>
             <td><strong>#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?></strong></td>
             <td><?= htmlspecialchars($b['guest_name']) ?><br><small><?= htmlspecialchars($b['guest_email']) ?></small></td>
             <td><strong><?= htmlspecialchars($b['room_name']) ?></strong></td>
             <td><?= htmlspecialchars($b['checkin_date']) ?> to <?= htmlspecialchars($b['checkout_date']) ?></td>
-            <td><?= htmlspecialchars($b['guests_count']) ?></td>
             <td><strong>&#8369;<?= number_format($b['total_amount'], 2) ?></strong></td>
+            <td>
+              <small style="color: var(--gray); display: block;"><?= htmlspecialchars($b['payment_method'] ?? 'Pay on Check-in') ?></small>
+              <span class="badge" style="background: <?= $isPaid ? 'var(--forest-green)' : 'var(--warm-gold)' ?>; color: #fff; font-size: 0.65rem;">
+                <?= htmlspecialchars($payStatus) ?>
+              </span>
+            </td>
             <td>
               <?php if ($b['status'] === 'cancelled'): ?>
                 <span class="badge badge-cancelled">cancelled</span>
@@ -141,7 +148,16 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
                 <span class="badge badge-confirmed">confirmed</span>
               <?php endif; ?>
             </td>
-            <td>
+            <td style="text-align: right; white-space: nowrap;">
+              <?php if ($b['status'] === 'confirmed' && !$isPaid): ?>
+                <a href="function.php?action=confirm-payment&id=<?= $b['id'] ?>" 
+                   class="btn btn-green btn-sm" 
+                   style="padding: 0.35rem 0.6rem; font-size: 0.68rem; margin-right: 4px;"
+                   onclick="return confirm('Confirm guest payment for this reservation?');">
+                  Mark Paid
+                </a>
+              <?php endif; ?>
+
               <?php if ($b['status'] === 'confirmed' && !$isPastStay): ?>
                 <a href="function.php?action=cancel-booking&id=<?= $b['id'] ?>" 
                    class="btn-action-cancel" 
