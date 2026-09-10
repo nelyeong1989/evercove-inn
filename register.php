@@ -5,7 +5,7 @@ $message = $_GET['message'] ?? null;
 
 // Redirect if already logged in
 if (isset($_SESSION['user_id'])) {
-    header('Location: index.php');
+    header('Location: index.php?status=success&message=' . urlencode('You are already an active member of the Evercove Circle!'));
     exit;
 }
 ?>

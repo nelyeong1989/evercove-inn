@@ -119,13 +119,17 @@ $message = $_GET['message'] ?? null;
     <span class="eyebrow">Membership</span>
     <h3>Join the Evercove Circle</h3>
     <p>Early access, late checkouts, and first pick of the lounge — free to join.</p>
-    <a href="register.php" class="btn btn-green">Join for Free</a>
+    <?php if (isset($_SESSION['user_id'])): ?>
+      <a href="index.php?status=success&message=<?= urlencode('You are already an active member of the Evercove Circle!') ?>" class="btn btn-green">Join for Free</a>
+    <?php else: ?>
+      <a href="register.php" class="btn btn-green">Join for Free</a>
+    <?php endif; ?>
   </div>
   <div class="panel panel-green">
     <span class="eyebrow">Book Direct</span>
     <h3>Reserve Your Room</h3>
     <p>Best rate guaranteed when you book directly with us — no middlemen, no markup.</p>
-    <a href="booking.php" class="btn btn-gold">Check Availability</a>
+    <a href="booking.php" class="btn btn-gold">View Rooms</a>
   </div>
 </div>
 
