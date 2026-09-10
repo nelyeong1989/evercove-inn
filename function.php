@@ -195,7 +195,7 @@ if (isset($_POST['book-stay'])) {
     }
 }
 
-// 5. Update Existing Reservation
+// 5. Update Existing Reservation (Safeguarded against in-progress or past stays)
 if (isset($_POST['update-booking'])) {
     if (!isset($_SESSION['user_id'])) {
         header('Location: login.php');
@@ -225,10 +225,18 @@ if (isset($_POST['update-booking'])) {
     try {
         $pdo = getConnection();
 
-        $chk = $pdo->prepare("SELECT id FROM bookings WHERE id = :id AND user_id = :uid AND status = 'confirmed'");
+        $chk = $pdo->prepare("SELECT id, checkin_date FROM bookings WHERE id = :id AND user_id = :uid AND status = 'confirmed'");
         $chk->execute([':id' => $bookingId, ':uid' => $_SESSION['user_id']]);
-        if (!$chk->fetch()) {
+        $existingBooking = $chk->fetch();
+
+        if (!$existingBooking) {
             header('Location: my-bookings.php?status=error&message=' . urlencode('Reservation cannot be modified.'));
+            exit;
+        }
+
+        // Prevent modification if stay has started or already completed
+        if ($existingBooking['checkin_date'] <= date('Y-m-d')) {
+            header('Location: my-bookings.php?status=error&message=' . urlencode('Active or past stays cannot be modified.'));
             exit;
         }
 
@@ -291,7 +299,7 @@ if (isset($_POST['update-booking'])) {
     }
 }
 
-// 6. Guest Cancels Own Booking
+// 6. Guest Cancels Own Booking (Restricted to upcoming reservations only)
 if (isset($_GET['action']) && $_GET['action'] === 'user-cancel-booking') {
     if (!isset($_SESSION['user_id'])) {
         header('Location: login.php');
@@ -302,10 +310,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'user-cancel-booking') {
     if ($bookingId) {
         try {
             $pdo = getConnection();
-            $stmt = $pdo->prepare("UPDATE bookings SET status = 'cancelled' WHERE id = :id AND user_id = :uid");
+            $stmt = $pdo->prepare("UPDATE bookings SET status = 'cancelled' WHERE id = :id AND user_id = :uid AND checkin_date > CURRENT_DATE AND status = 'confirmed'");
             $stmt->execute([':id' => $bookingId, ':uid' => $_SESSION['user_id']]);
 
-            header('Location: my-bookings.php?status=success&message=' . urlencode('Reservation #EVR-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT) . ' has been cancelled.'));
+            if ($stmt->rowCount() > 0) {
+                header('Location: my-bookings.php?status=success&message=' . urlencode('Reservation #EVR-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT) . ' has been cancelled.'));
+            } else {
+                header('Location: my-bookings.php?status=error&message=' . urlencode('Active, completed, or already cancelled stays cannot be cancelled.'));
+            }
             exit;
         } catch (PDOException $e) {
             header('Location: my-bookings.php?status=error&message=' . urlencode($e->getMessage()));
@@ -317,7 +329,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'user-cancel-booking') {
     exit;
 }
 
-// 7. Admin Cancels Booking
+// 7. Admin Cancels Booking (Restricted to non-completed stays)
 if (isset($_GET['action']) && $_GET['action'] === 'cancel-booking') {
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
         header('Location: login.php?status=error&message=' . urlencode('Unauthorized access.'));
@@ -328,10 +340,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'cancel-booking') {
     if ($bookingId) {
         try {
             $pdo = getConnection();
-            $stmt = $pdo->prepare("UPDATE bookings SET status = 'cancelled' WHERE id = :id");
+            $stmt = $pdo->prepare("UPDATE bookings SET status = 'cancelled' WHERE id = :id AND checkout_date >= CURRENT_DATE");
             $stmt->execute([':id' => $bookingId]);
 
-            header('Location: admin.php?status=success&message=' . urlencode('Booking #EVR-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT) . ' marked as cancelled. Room dates reopened.'));
+            if ($stmt->rowCount() > 0) {
+                header('Location: admin.php?status=success&message=' . urlencode('Booking #EVR-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT) . ' marked as cancelled. Room dates reopened.'));
+            } else {
+                header('Location: admin.php?status=error&message=' . urlencode('Past completed stays cannot be cancelled.'));
+            }
             exit;
         } catch (PDOException $e) {
             header('Location: admin.php?status=error&message=' . urlencode($e->getMessage()));

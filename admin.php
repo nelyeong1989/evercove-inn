@@ -121,6 +121,10 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
       </thead>
       <tbody>
         <?php foreach ($bookings as $b): ?>
+          <?php 
+            $today = date('Y-m-d');
+            $isPastStay = ($b['checkout_date'] < $today);
+          ?>
           <tr>
             <td><strong>#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?></strong></td>
             <td><?= htmlspecialchars($b['guest_name']) ?><br><small><?= htmlspecialchars($b['guest_email']) ?></small></td>
@@ -129,17 +133,23 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
             <td><?= htmlspecialchars($b['guests_count']) ?></td>
             <td><strong>&#8369;<?= number_format($b['total_amount'], 2) ?></strong></td>
             <td>
-              <span class="badge <?= $b['status'] === 'confirmed' ? 'badge-confirmed' : 'badge-cancelled' ?>">
-                <?= htmlspecialchars($b['status']) ?>
-              </span>
+              <?php if ($b['status'] === 'cancelled'): ?>
+                <span class="badge badge-cancelled">cancelled</span>
+              <?php elseif ($isPastStay): ?>
+                <span class="badge" style="background: var(--gray); color: #fff;">completed</span>
+              <?php else: ?>
+                <span class="badge badge-confirmed">confirmed</span>
+              <?php endif; ?>
             </td>
             <td>
-              <?php if ($b['status'] === 'confirmed'): ?>
+              <?php if ($b['status'] === 'confirmed' && !$isPastStay): ?>
                 <a href="function.php?action=cancel-booking&id=<?= $b['id'] ?>" 
                    class="btn-action-cancel" 
                    onclick="return confirm('Cancel this reservation? This reopens the dates immediately.');">
                   Cancel
                 </a>
+              <?php elseif ($isPastStay && $b['status'] === 'confirmed'): ?>
+                <span style="color: var(--gray); font-size: 0.75rem;">Completed</span>
               <?php else: ?>
                 <span style="color: var(--gray); font-size: 0.75rem;">None</span>
               <?php endif; ?>
@@ -235,7 +245,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
             <td>
               <a href="function.php?action=delete-review&id=<?= $rev['id'] ?>" 
                  class="btn-action-cancel" 
-                 onclick="return confirm('Permanently remove this review from the public website?');">
+                 onclick="return confirm('Permanently remove this review from the public site?');">
                 Delete
               </a>
             </td>

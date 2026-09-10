@@ -101,6 +101,10 @@ try {
       </thead>
       <tbody>
         <?php foreach ($myBookings as $b): ?>
+          <?php 
+            $today = date('Y-m-d');
+            $isPastStay = ($b['checkout_date'] < $today);
+          ?>
           <tr>
             <td><strong>#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?></strong></td>
             <td>
@@ -114,21 +118,27 @@ try {
             <td><?= htmlspecialchars($b['guests_count']) ?></td>
             <td><strong>₱<?= number_format($b['total_amount'], 2) ?></strong></td>
             <td>
-              <span class="badge <?= $b['status'] === 'confirmed' ? 'badge-confirmed' : 'badge-cancelled' ?>">
-                <?= htmlspecialchars($b['status']) ?>
-              </span>
+              <?php if ($b['status'] === 'cancelled'): ?>
+                <span class="badge badge-cancelled">Cancelled</span>
+              <?php elseif ($isPastStay): ?>
+                <span class="badge" style="background: var(--gray); color: #fff;">Completed</span>
+              <?php else: ?>
+                <span class="badge badge-confirmed">Confirmed</span>
+              <?php endif; ?>
             </td>
             <td style="text-align: right; white-space: nowrap;">
               <a href="booking-success.php?id=<?= $b['id'] ?>" class="btn-action-view" style="margin-right: 4px;">Receipt</a>
-              <?php if ($b['status'] === 'confirmed'): ?>
+              <?php if ($b['status'] === 'confirmed' && !$isPastStay): ?>
                 <a href="edit-booking.php?id=<?= $b['id'] ?>" class="btn-action-edit" style="margin-right: 4px;">Modify</a>
                 <a href="function.php?action=user-cancel-booking&id=<?= $b['id'] ?>" 
                    class="btn-action-cancel" 
                    onclick="return confirm('Are you sure you want to cancel this reservation?');">
                   Cancel
                 </a>
+              <?php elseif ($isPastStay && $b['status'] === 'confirmed'): ?>
+                <a href="reviews.php" class="btn btn-sage btn-sm" style="padding: 0.35rem 0.65rem; font-size: 0.7rem;">Leave Review</a>
               <?php else: ?>
-                <span style="color: var(--gray); font-size: 0.75rem;">Cancelled</span>
+                <span style="color: var(--gray); font-size: 0.75rem;">None</span>
               <?php endif; ?>
             </td>
           </tr>
