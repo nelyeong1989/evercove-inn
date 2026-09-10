@@ -1299,6 +1299,11 @@ img {
   color: var(--white); 
 }
 
+.badge-completed {
+  background: var(--gray);
+  color: var(--white);
+}
+
 /* Table action buttons with solid fills */
 .btn-action-view,
 .btn-action-edit,

@@ -121,7 +121,7 @@ try {
               <?php if ($b['status'] === 'cancelled'): ?>
                 <span class="badge badge-cancelled">Cancelled</span>
               <?php elseif ($isPastStay): ?>
-                <span class="badge" style="background: var(--gray); color: #fff;">Completed</span>
+                <span class="badge badge-completed">Completed</span>
               <?php else: ?>
                 <span class="badge badge-confirmed">Confirmed</span>
               <?php endif; ?>
