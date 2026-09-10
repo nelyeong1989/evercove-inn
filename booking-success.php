@@ -56,11 +56,11 @@ if (!$booking || ($booking['user_id'] != $_SESSION['user_id'] && $_SESSION['role
     </tr>
     <tr>
       <th>Check-in Date</th>
-      <td><?= htmlspecialchars($booking['checkin_date']) ?></td>
+      <td><?= date('F j, Y', strtotime($booking['checkin_date'])) ?></td>
     </tr>
     <tr>
       <th>Check-out Date</th>
-      <td><?= htmlspecialchars($booking['checkout_date']) ?></td>
+      <td><?= date('F j, Y', strtotime($booking['checkout_date'])) ?></td>
     </tr>
     <tr>
       <th>Guests</th>

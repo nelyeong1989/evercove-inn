@@ -26,8 +26,9 @@ $stmt = $pdo->prepare("SELECT * FROM bookings WHERE id = :id AND user_id = :uid 
 $stmt->execute([':id' => $bookingId, ':uid' => $userId]);
 $booking = $stmt->fetch();
 
-if (!$booking) {
-    header('Location: my-bookings.php?status=error&message=' . urlencode('Reservation not found or cannot be modified.'));
+// Block access if reservation doesn't exist, is cancelled, or has already started/completed
+if (!$booking || $booking['checkin_date'] <= date('Y-m-d')) {
+    header('Location: my-bookings.php?status=error&message=' . urlencode('Past or in-progress stays cannot be modified.'));
     exit;
 }
 
@@ -137,7 +138,6 @@ $rooms = $pdo->query("SELECT * FROM rooms ORDER BY id ASC")->fetchAll();
 </footer>
 
 <script>
-  // Update guest limit dynamically based on selected room
   function updateGuestLimit() {
     const roomSelect = document.getElementById('room_id');
     const guestInput = document.getElementById('guests');
