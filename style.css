@@ -57,8 +57,8 @@ img {
 }
 
 .container {
-  width: 90%;
-  max-width: 1080px;
+  width: 92%;
+  max-width: 1120px;
   margin: 0 auto;
 }
 
@@ -100,7 +100,7 @@ img {
 }
 
 .btn-sm {
-  padding: 0.6rem 1rem;
+  padding: 0.5rem 0.8rem;
 }
 
 .btn-gold { 
@@ -1232,11 +1232,14 @@ img {
   color: var(--emerald-green);
 }
 
-/* Admin and guest portal tables */
+/* =======================================================
+   ADMIN CONSOLE & RESPONSIVE FLUID TABLE STYLING
+   ======================================================= */
 .admin-wrap {
-  max-width: 1240px;
-  margin: 2.5rem auto;
-  padding: 0 1.2rem;
+  width: 95%;
+  max-width: 1360px;
+  margin: 2rem auto;
+  padding: 0 0.5rem;
 }
 
 .admin-header {
@@ -1246,31 +1249,39 @@ img {
   margin-bottom: 2rem;
 }
 
+/* Responsive Table Wrapper */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--white);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  margin-bottom: 2.5rem;
+}
+
 .admin-table {
   width: 100%;
   border-collapse: collapse;
   background: var(--white);
-  border-radius: 8px;
-  overflow: hidden;
-  margin-bottom: 2.5rem;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  margin-bottom: 0;
 }
 
 .admin-table th,
 .admin-table td {
-  padding: 0.85rem 0.8rem;
+  padding: 0.7rem 0.55rem;
   text-align: left;
-  border-bottom: 1px solid rgba(188, 148, 86, 0.2);
-  font-size: 0.82rem;
+  border-bottom: 1px solid rgba(188, 148, 86, 0.18);
+  font-size: 0.78rem;
   vertical-align: middle;
 }
 
 .admin-table th {
   background: var(--emerald-green);
   color: var(--cream);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   white-space: nowrap;
 }
 
@@ -1278,9 +1289,9 @@ img {
 .badge {
   display: inline-block;
   white-space: nowrap;
-  padding: 0.26rem 0.55rem;
+  padding: 0.22rem 0.46rem;
   border-radius: 4px;
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   font-weight: 700;
   text-transform: uppercase;
   line-height: 1.1;
@@ -1316,20 +1327,21 @@ img {
   white-space: nowrap;
 }
 
-/* Table action buttons with solid fills */
+/* Compact table action buttons */
 .btn-action-view,
 .btn-action-edit,
 .btn-action-cancel {
   display: inline-block;
-  padding: 0.4rem 0.75rem;
+  padding: 0.32rem 0.55rem;
   border-radius: 4px;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   text-decoration: none;
   cursor: pointer;
   border: none;
+  line-height: 1;
 }
 
 .btn-action-view {
@@ -1474,45 +1486,6 @@ img {
   font-weight: 600;
 }
 
-/* Formal staff console login theme */
-.admin-login-body {
-  background-color: var(--emerald-green);
-}
-
-.admin-auth-box {
-  max-width: 440px;
-  margin: 5rem auto;
-  background: var(--cream-light);
-  padding: 2.6rem;
-  border-radius: 14px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(188, 148, 86, 0.3);
-}
-
-.admin-auth-header {
-  text-align: center;
-  margin-bottom: 1.6rem;
-}
-
-.admin-auth-header h2 {
-  color: var(--emerald-green);
-  font-size: 1.6rem;
-  margin: 0.3rem 0;
-}
-
-.admin-auth-header p {
-  font-size: 0.85rem;
-  color: var(--gray);
-}
-
-.admin-auth-footer {
-  margin-top: 1.5rem;
-  text-align: center;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--emerald-green);
-}
-
 /* Payment workflow & proof verification styles */
 .payment-option-grid {
   display: grid;
@@ -1561,6 +1534,11 @@ img {
   max-height: 24px;
   width: auto;
   object-fit: contain;
+}
+
+.payment-emoji {
+  font-size: 1.5rem;
+  line-height: 1;
 }
 
 .payment-title {

@@ -106,196 +106,205 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
   <?php if (empty($bookings)): ?>
     <p style="font-size: 0.85rem; color: var(--gray); margin-bottom: 2rem;">No reservations yet.</p>
   <?php else: ?>
-    <table class="admin-table" id="bookingsTable">
+    <!-- Table wrapper preventing clipping and overflow -->
+    <div class="table-responsive">
+      <table class="admin-table" id="bookingsTable">
+        <thead>
+          <tr>
+            <th>Ref</th>
+            <th>Guest</th>
+            <th>Room</th>
+            <th>Dates</th>
+            <th>Total</th>
+            <th>Payment</th>
+            <th>Status</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($bookings as $b): ?>
+            <?php 
+              $today = date('Y-m-d');
+              $isPastStay = ($b['checkout_date'] < $today);
+              $payStatus = $b['payment_status'] ?? 'Pending (Due at Check-in)';
+              $isPaid = in_array($payStatus, ['Paid (Online)', 'Paid (Verified)', 'Paid (Front Desk)'], true);
+            ?>
+            <tr>
+              <td class="cell-nowrap">
+                <a href="booking-success.php?id=<?= $b['id'] ?>" target="_blank" style="color: var(--emerald-green); text-decoration: underline;" title="View Voucher Receipt">
+                  <strong>#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?></strong>
+                </a>
+              </td>
+              <td>
+                <strong style="font-size: 0.8rem;"><?= htmlspecialchars($b['guest_name']) ?></strong><br>
+                <small style="color: var(--gray); font-size: 0.72rem;"><?= htmlspecialchars($b['guest_email']) ?></small>
+              </td>
+              <td class="cell-nowrap">
+                <strong><?= htmlspecialchars($b['room_name']) ?></strong>
+              </td>
+              <td class="cell-nowrap" style="font-size: 0.76rem; color: #3d3a30;">
+                <?= date('M j', strtotime($b['checkin_date'])) ?> &ndash; <?= date('M j, Y', strtotime($b['checkout_date'])) ?>
+              </td>
+              <td class="cell-nowrap">
+                <strong>&#8369;<?= number_format($b['total_amount'], 2) ?></strong>
+              </td>
+              <td>
+                <small style="color: var(--gray); display: block; font-weight: 600; white-space: nowrap; font-size: 0.7rem; margin-bottom: 2px;">
+                  <?= htmlspecialchars($b['payment_method'] ?? 'Pay on Check-in') ?>
+                </small>
+                <span class="badge" style="background: <?= $isPaid ? 'var(--forest-green)' : 'var(--warm-gold)' ?>; color: #fff;">
+                  <?= htmlspecialchars($payStatus) ?>
+                </span>
+                <?php if (!empty($b['payment_ref'])): ?>
+                  <small style="display: block; color: var(--emerald-green); font-family: monospace; font-size: 0.68rem; margin-top: 2px; white-space: nowrap;">
+                    Ref: <?= htmlspecialchars($b['payment_ref']) ?>
+                  </small>
+                <?php endif; ?>
+                <?php if (!empty($b['payment_proof'])): ?>
+                  <a href="<?= htmlspecialchars($b['payment_proof']) ?>" target="_blank" style="display: inline-block; font-size: 0.66rem; font-weight: 700; color: var(--gold-dark); text-decoration: underline; margin-top: 2px; white-space: nowrap;">
+                    🔍 Screenshot
+                  </a>
+                <?php endif; ?>
+              </td>
+              <td class="cell-nowrap">
+                <?php if ($b['status'] === 'cancelled'): ?>
+                  <span class="badge badge-cancelled">cancelled</span>
+                <?php elseif ($isPastStay): ?>
+                  <span class="badge badge-completed">completed</span>
+                <?php else: ?>
+                  <span class="badge badge-confirmed">confirmed</span>
+                <?php endif; ?>
+              </td>
+              <td class="cell-nowrap" style="text-align: right;">
+                <a href="booking-success.php?id=<?= $b['id'] ?>" target="_blank" class="btn-action-view" style="margin-right: 3px;">Receipt</a>
+
+                <?php if ($b['status'] === 'confirmed' && !$isPaid): ?>
+                  <a href="function.php?action=confirm-payment&id=<?= $b['id'] ?>" 
+                     class="btn btn-green btn-sm" 
+                     style="padding: 0.32rem 0.5rem; font-size: 0.66rem; margin-right: 3px;"
+                     onclick="return confirm('Confirm verified payment for this reservation?');">
+                    Mark Paid
+                  </a>
+                <?php endif; ?>
+
+                <?php if ($b['status'] === 'confirmed' && !$isPastStay): ?>
+                  <a href="function.php?action=cancel-booking&id=<?= $b['id'] ?>" 
+                     class="btn-action-cancel" 
+                     onclick="return confirm('Cancel this reservation? This reopens the dates immediately.');">
+                    Cancel
+                  </a>
+                <?php elseif ($isPastStay && $b['status'] === 'confirmed'): ?>
+                  <span style="color: var(--gray); font-size: 0.72rem;">Completed</span>
+                <?php else: ?>
+                  <span style="color: var(--gray); font-size: 0.72rem;">None</span>
+                <?php endif; ?>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  <?php endif; ?>
+
+  <!-- Room Rates Management -->
+  <h3 style="color: var(--emerald-green); margin-bottom: 0.8rem; margin-top: 2rem;">Room Rates &amp; Catalog Management</h3>
+  <div class="table-responsive">
+    <table class="admin-table">
       <thead>
         <tr>
-          <th>Ref</th>
-          <th>Guest</th>
-          <th>Room</th>
-          <th>Dates</th>
-          <th>Total</th>
-          <th>Payment</th>
-          <th>Status</th>
-          <th style="text-align: right;">Action</th>
+          <th>Room Name</th>
+          <th>Category</th>
+          <th>Current Rate / Night</th>
+          <th>Update Rate</th>
         </tr>
       </thead>
       <tbody>
-        <?php foreach ($bookings as $b): ?>
-          <?php 
-            $today = date('Y-m-d');
-            $isPastStay = ($b['checkout_date'] < $today);
-            $payStatus = $b['payment_status'] ?? 'Pending (Due at Check-in)';
-            $isPaid = (strpos($payStatus, 'Paid (Verified)') !== false || strpos($payStatus, 'Paid (Front Desk)') !== false);
-          ?>
+        <?php foreach ($rooms as $room): ?>
           <tr>
-            <td class="cell-nowrap">
-              <a href="booking-success.php?id=<?= $b['id'] ?>" target="_blank" style="color: var(--emerald-green); text-decoration: underline;" title="View Voucher Receipt">
-                <strong>#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?></strong>
-              </a>
-            </td>
+            <td><strong><?= htmlspecialchars($room['name']) ?></strong></td>
+            <td><?= htmlspecialchars($room['category']) ?></td>
+            <td><strong>&#8369;<?= number_format($room['price_per_night'], 2) ?></strong></td>
             <td>
-              <strong><?= htmlspecialchars($b['guest_name']) ?></strong><br>
-              <small style="color: var(--gray); font-size: 0.75rem;"><?= htmlspecialchars($b['guest_email']) ?></small>
-            </td>
-            <td class="cell-nowrap">
-              <strong><?= htmlspecialchars($b['room_name']) ?></strong>
-            </td>
-            <td class="cell-nowrap" style="font-size: 0.8rem; color: #3d3a30;">
-              <?= date('M j', strtotime($b['checkin_date'])) ?> &ndash; <?= date('M j, Y', strtotime($b['checkout_date'])) ?>
-            </td>
-            <td class="cell-nowrap">
-              <strong>&#8369;<?= number_format($b['total_amount'], 2) ?></strong>
-            </td>
-            <td>
-              <small style="color: var(--gray); display: block; font-weight: 600; white-space: nowrap; margin-bottom: 2px;">
-                <?= htmlspecialchars($b['payment_method'] ?? 'Pay on Check-in') ?>
-              </small>
-              <span class="badge" style="background: <?= $isPaid ? 'var(--forest-green)' : 'var(--warm-gold)' ?>; color: #fff;">
-                <?= htmlspecialchars($payStatus) ?>
-              </span>
-              <?php if (!empty($b['payment_ref'])): ?>
-                <small style="display: block; color: var(--emerald-green); font-family: monospace; font-size: 0.72rem; margin-top: 3px; white-space: nowrap;">
-                  Ref: <?= htmlspecialchars($b['payment_ref']) ?>
-                </small>
-              <?php endif; ?>
-              <?php if (!empty($b['payment_proof'])): ?>
-                <a href="<?= htmlspecialchars($b['payment_proof']) ?>" target="_blank" style="display: inline-block; font-size: 0.68rem; font-weight: 700; color: var(--gold-dark); text-decoration: underline; margin-top: 3px; white-space: nowrap;">
-                  🔍 View Screenshot
-                </a>
-              <?php endif; ?>
-            </td>
-            <td class="cell-nowrap">
-              <?php if ($b['status'] === 'cancelled'): ?>
-                <span class="badge badge-cancelled">cancelled</span>
-              <?php elseif ($isPastStay): ?>
-                <span class="badge badge-completed">completed</span>
-              <?php else: ?>
-                <span class="badge badge-confirmed">confirmed</span>
-              <?php endif; ?>
-            </td>
-            <td class="cell-nowrap" style="text-align: right;">
-              <a href="booking-success.php?id=<?= $b['id'] ?>" target="_blank" class="btn-action-view" style="margin-right: 4px;">Receipt</a>
-
-              <?php if ($b['status'] === 'confirmed' && !$isPaid): ?>
-                <a href="function.php?action=confirm-payment&id=<?= $b['id'] ?>" 
-                   class="btn btn-green btn-sm" 
-                   style="padding: 0.35rem 0.6rem; font-size: 0.68rem; margin-right: 4px;"
-                   onclick="return confirm('Confirm verified payment for this reservation?');">
-                  Mark Paid
-                </a>
-              <?php endif; ?>
-
-              <?php if ($b['status'] === 'confirmed' && !$isPastStay): ?>
-                <a href="function.php?action=cancel-booking&id=<?= $b['id'] ?>" 
-                   class="btn-action-cancel" 
-                   onclick="return confirm('Cancel this reservation? This reopens the dates immediately.');">
-                  Cancel
-                </a>
-              <?php elseif ($isPastStay && $b['status'] === 'confirmed'): ?>
-                <span style="color: var(--gray); font-size: 0.75rem;">Completed</span>
-              <?php else: ?>
-                <span style="color: var(--gray); font-size: 0.75rem;">None</span>
-              <?php endif; ?>
+              <form method="POST" action="function.php" style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="hidden" name="room_id" value="<?= $room['id'] ?>">
+                <input type="number" step="50" min="500" name="price_per_night" value="<?= (int)$room['price_per_night'] ?>" class="rate-inline-input" required>
+                <button type="submit" name="update-room-rate" class="btn btn-green btn-sm" style="padding: 0.35rem 0.7rem;">Save</button>
+              </form>
             </td>
           </tr>
         <?php endforeach; ?>
       </tbody>
     </table>
-  <?php endif; ?>
-
-  <!-- Room Rates Management -->
-  <h3 style="color: var(--emerald-green); margin-bottom: 0.8rem; margin-top: 2rem;">Room Rates &amp; Catalog Management</h3>
-  <table class="admin-table">
-    <thead>
-      <tr>
-        <th>Room Name</th>
-        <th>Category</th>
-        <th>Current Rate / Night</th>
-        <th>Update Rate</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php foreach ($rooms as $room): ?>
-        <tr>
-          <td><strong><?= htmlspecialchars($room['name']) ?></strong></td>
-          <td><?= htmlspecialchars($room['category']) ?></td>
-          <td><strong>&#8369;<?= number_format($room['price_per_night'], 2) ?></strong></td>
-          <td>
-            <form method="POST" action="function.php" style="display: flex; gap: 0.5rem; align-items: center;">
-              <input type="hidden" name="room_id" value="<?= $room['id'] ?>">
-              <input type="number" step="50" min="500" name="price_per_night" value="<?= (int)$room['price_per_night'] ?>" class="rate-inline-input" required>
-              <button type="submit" name="update-room-rate" class="btn btn-green btn-sm" style="padding: 0.4rem 0.8rem;">Save</button>
-            </form>
-          </td>
-        </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
+  </div>
 
   <!-- Registered User Accounts -->
   <h3 style="color: var(--emerald-green); margin-bottom: 0.8rem; margin-top: 2rem;">Registered Accounts</h3>
-  <table class="admin-table">
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Username</th>
-        <th>Email</th>
-        <th>Role</th>
-        <th>Created</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php foreach ($users as $u): ?>
+  <div class="table-responsive">
+    <table class="admin-table">
+      <thead>
         <tr>
-          <td><?= htmlspecialchars($u['id']) ?></td>
-          <td><strong><?= htmlspecialchars($u['username']) ?></strong></td>
-          <td><?= htmlspecialchars($u['email']) ?></td>
-          <td>
-            <span class="badge <?= $u['role'] === 'admin' ? 'badge-admin' : 'badge-user' ?>">
-              <?= htmlspecialchars($u['role']) ?>
-            </span>
-          </td>
-          <td><?= htmlspecialchars($u['created_at']) ?></td>
+          <th>ID</th>
+          <th>Username</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Created</th>
         </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        <?php foreach ($users as $u): ?>
+          <tr>
+            <td><?= htmlspecialchars($u['id']) ?></td>
+            <td><strong><?= htmlspecialchars($u['username']) ?></strong></td>
+            <td><?= htmlspecialchars($u['email']) ?></td>
+            <td>
+              <span class="badge <?= $u['role'] === 'admin' ? 'badge-admin' : 'badge-user' ?>">
+                <?= htmlspecialchars($u['role']) ?>
+              </span>
+            </td>
+            <td><?= htmlspecialchars($u['created_at']) ?></td>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
 
   <!-- Guest Reviews Moderation -->
   <h3 style="color: var(--emerald-green); margin-bottom: 0.8rem; margin-top: 2rem;">Guest Feedback Moderation</h3>
   <?php if (empty($reviews)): ?>
     <p style="font-size: 0.85rem; color: var(--gray);">No guest reviews recorded yet.</p>
   <?php else: ?>
-    <table class="admin-table">
-      <thead>
-        <tr>
-          <th>Attribution</th>
-          <th>Room Stayed</th>
-          <th>Rating</th>
-          <th>Feedback</th>
-          <th>Date</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php foreach ($reviews as $rev): ?>
+    <div class="table-responsive">
+      <table class="admin-table">
+        <thead>
           <tr>
-            <td><strong><?= htmlspecialchars($rev['guest_name']) ?></strong></td>
-            <td><?= htmlspecialchars($rev['room_type']) ?></td>
-            <td><?= htmlspecialchars($rev['rating']) ?> / 5 &#9733;</td>
-            <td><?= htmlspecialchars($rev['comment']) ?></td>
-            <td><?= htmlspecialchars($rev['created_at']) ?></td>
-            <td>
-              <a href="function.php?action=delete-review&id=<?= $rev['id'] ?>" 
-                 class="btn-action-cancel" 
-                 onclick="return confirm('Permanently remove this review from the public site?');">
-                Delete
-              </a>
-            </td>
+            <th>Attribution</th>
+            <th>Room Stayed</th>
+            <th>Rating</th>
+            <th>Feedback</th>
+            <th>Date</th>
+            <th>Action</th>
           </tr>
-        <?php endforeach; ?>
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          <?php foreach ($reviews as $rev): ?>
+            <tr>
+              <td><strong><?= htmlspecialchars($rev['guest_name']) ?></strong></td>
+              <td><?= htmlspecialchars($rev['room_type']) ?></td>
+              <td><?= htmlspecialchars($rev['rating']) ?> / 5 &#9733;</td>
+              <td><?= htmlspecialchars($rev['comment']) ?></td>
+              <td><?= htmlspecialchars($rev['created_at']) ?></td>
+              <td>
+                <a href="function.php?action=delete-review&id=<?= $rev['id'] ?>" 
+                   class="btn-action-cancel" 
+                   onclick="return confirm('Permanently remove this review from the public site?');">
+                  Delete
+                </a>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
   <?php endif; ?>
 
 </div>

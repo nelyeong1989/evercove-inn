@@ -117,7 +117,7 @@ try {
             <label class="payment-card active" onclick="selectPayment(this, 'checkin')">
               <input type="radio" name="payment_method" value="Pay on Check-in" checked>
               <div class="payment-icon-wrap">
-                <span style="font-size: 1.5rem;">🏨</span>
+                <span class="payment-emoji">🏨</span>
               </div>
               <div class="payment-title">Pay on Check-in</div>
               <div class="payment-sub">Cash / Card at front desk</div>
@@ -127,18 +127,17 @@ try {
             <label class="payment-card" onclick="selectPayment(this, 'gcash')">
               <input type="radio" name="payment_method" value="GCash (Online)">
               <div class="payment-icon-wrap">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/GCash_logo.svg/320px-GCash_logo.svg.png" alt="GCash">
+                <img src="images/gcash-logo.jpg" alt="GCash" onerror="this.onerror=null;this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/GCash_logo.svg/320px-GCash_logo.svg.png';">
               </div>
               <div class="payment-title">GCash Express</div>
               <div class="payment-sub">Scan QR or Send Money</div>
             </label>
 
-            <!-- Credit / Debit Card -->
+            <!-- Credit / Debit Card (Emoji) -->
             <label class="payment-card" onclick="selectPayment(this, 'card')">
               <input type="radio" name="payment_method" value="Card (Online)">
               <div class="payment-icon-wrap">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/320px-Mastercard-logo.svg.png" alt="Mastercard" style="height: 18px; margin-right: 4px;">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/320px-Visa_Inc._logo.svg.png" alt="Visa" style="height: 12px;">
+                <span class="payment-emoji">💳</span>
               </div>
               <div class="payment-title">Bank / Card</div>
               <div class="payment-sub">Direct Bank Deposit</div>
@@ -162,10 +161,10 @@ try {
           <div class="payment-details-box" id="box-gcash">
             <div class="company-bank-badge">
               <div style="display:flex; align-items:center; gap: 0.6rem;">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/GCash_logo.svg/320px-GCash_logo.svg.png" alt="GCash" style="height: 22px;">
+                <img src="images/gcash-logo.jpg" alt="GCash" style="height: 22px;" onerror="this.onerror=null;this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/GCash_logo.svg/320px-GCash_logo.svg.png';">
                 <strong style="color: var(--emerald-green); font-size: 0.92rem;">Official Evercove GCash Account</strong>
               </div>
-              <span class="badge badge-confirmed" style="font-size: 0.65rem;">Verified Merchant</span>
+              <span class="badge badge-confirmed">Verified Merchant</span>
             </div>
 
             <div class="company-info-row">
@@ -199,8 +198,11 @@ try {
           <!-- Bank / Card Details & Verification Box -->
           <div class="payment-details-box" id="box-card">
             <div class="company-bank-badge">
-              <strong style="color: var(--emerald-green); font-size: 0.92rem;">Official Corporate Bank Account (BDO)</strong>
-              <span class="badge badge-confirmed" style="font-size: 0.65rem;">Online Banking</span>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="font-size: 1.3rem;">💳</span>
+                <strong style="color: var(--emerald-green); font-size: 0.92rem;">Official Corporate Bank Account (BDO)</strong>
+              </div>
+              <span class="badge badge-confirmed">Online Banking</span>
             </div>
 
             <div class="company-info-row">
