@@ -125,44 +125,55 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
             $today = date('Y-m-d');
             $isPastStay = ($b['checkout_date'] < $today);
             $payStatus = $b['payment_status'] ?? 'Pending (Due at Check-in)';
-            $isPaid = (strpos($payStatus, 'Paid') !== false);
+            $isPaid = (strpos($payStatus, 'Paid (Verified)') !== false || strpos($payStatus, 'Paid (Front Desk)') !== false);
           ?>
           <tr>
-            <td>
+            <td class="cell-nowrap">
               <a href="booking-success.php?id=<?= $b['id'] ?>" target="_blank" style="color: var(--emerald-green); text-decoration: underline;" title="View Voucher Receipt">
                 <strong>#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?></strong>
               </a>
             </td>
-            <td><?= htmlspecialchars($b['guest_name']) ?><br><small><?= htmlspecialchars($b['guest_email']) ?></small></td>
-            <td><strong><?= htmlspecialchars($b['room_name']) ?></strong></td>
-            <td><?= htmlspecialchars($b['checkin_date']) ?> to <?= htmlspecialchars($b['checkout_date']) ?></td>
-            <td><strong>&#8369;<?= number_format($b['total_amount'], 2) ?></strong></td>
             <td>
-              <small style="color: var(--gray); display: block; font-weight: 600;"><?= htmlspecialchars($b['payment_method'] ?? 'Pay on Check-in') ?></small>
-              <span class="badge" style="background: <?= $isPaid ? 'var(--forest-green)' : 'var(--warm-gold)' ?>; color: #fff; font-size: 0.65rem;">
+              <strong><?= htmlspecialchars($b['guest_name']) ?></strong><br>
+              <small style="color: var(--gray); font-size: 0.75rem;"><?= htmlspecialchars($b['guest_email']) ?></small>
+            </td>
+            <td class="cell-nowrap">
+              <strong><?= htmlspecialchars($b['room_name']) ?></strong>
+            </td>
+            <td class="cell-nowrap" style="font-size: 0.8rem; color: #3d3a30;">
+              <?= date('M j', strtotime($b['checkin_date'])) ?> &ndash; <?= date('M j, Y', strtotime($b['checkout_date'])) ?>
+            </td>
+            <td class="cell-nowrap">
+              <strong>&#8369;<?= number_format($b['total_amount'], 2) ?></strong>
+            </td>
+            <td>
+              <small style="color: var(--gray); display: block; font-weight: 600; white-space: nowrap; margin-bottom: 2px;">
+                <?= htmlspecialchars($b['payment_method'] ?? 'Pay on Check-in') ?>
+              </small>
+              <span class="badge" style="background: <?= $isPaid ? 'var(--forest-green)' : 'var(--warm-gold)' ?>; color: #fff;">
                 <?= htmlspecialchars($payStatus) ?>
               </span>
               <?php if (!empty($b['payment_ref'])): ?>
-                <small style="display: block; color: var(--emerald-green); font-family: monospace; margin-top: 2px;">
+                <small style="display: block; color: var(--emerald-green); font-family: monospace; font-size: 0.72rem; margin-top: 3px; white-space: nowrap;">
                   Ref: <?= htmlspecialchars($b['payment_ref']) ?>
                 </small>
               <?php endif; ?>
               <?php if (!empty($b['payment_proof'])): ?>
-                <a href="<?= htmlspecialchars($b['payment_proof']) ?>" target="_blank" style="display: inline-block; font-size: 0.68rem; font-weight: 700; color: var(--gold-dark); text-decoration: underline; margin-top: 3px;">
+                <a href="<?= htmlspecialchars($b['payment_proof']) ?>" target="_blank" style="display: inline-block; font-size: 0.68rem; font-weight: 700; color: var(--gold-dark); text-decoration: underline; margin-top: 3px; white-space: nowrap;">
                   🔍 View Screenshot
                 </a>
               <?php endif; ?>
             </td>
-            <td>
+            <td class="cell-nowrap">
               <?php if ($b['status'] === 'cancelled'): ?>
                 <span class="badge badge-cancelled">cancelled</span>
               <?php elseif ($isPastStay): ?>
-                <span class="badge" style="background: var(--gray); color: #fff;">completed</span>
+                <span class="badge badge-completed">completed</span>
               <?php else: ?>
                 <span class="badge badge-confirmed">confirmed</span>
               <?php endif; ?>
             </td>
-            <td style="text-align: right; white-space: nowrap;">
+            <td class="cell-nowrap" style="text-align: right;">
               <a href="booking-success.php?id=<?= $b['id'] ?>" target="_blank" class="btn-action-view" style="margin-right: 4px;">Receipt</a>
 
               <?php if ($b['status'] === 'confirmed' && !$isPaid): ?>

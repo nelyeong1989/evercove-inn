@@ -1234,9 +1234,9 @@ img {
 
 /* Admin and guest portal tables */
 .admin-wrap {
-  max-width: 1120px;
+  max-width: 1240px;
   margin: 2.5rem auto;
-  padding: 0 1rem;
+  padding: 0 1.2rem;
 }
 
 .admin-header {
@@ -1258,10 +1258,11 @@ img {
 
 .admin-table th,
 .admin-table td {
-  padding: 0.85rem 1rem;
+  padding: 0.85rem 0.8rem;
   text-align: left;
   border-bottom: 1px solid rgba(188, 148, 86, 0.2);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
+  vertical-align: middle;
 }
 
 .admin-table th {
@@ -1269,14 +1270,21 @@ img {
   color: var(--cream);
   font-size: 0.72rem;
   text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
 }
 
+/* Badges with single-line lock */
 .badge {
-  padding: 0.25rem 0.55rem;
+  display: inline-block;
+  white-space: nowrap;
+  padding: 0.26rem 0.55rem;
   border-radius: 4px;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 700;
   text-transform: uppercase;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
 }
 
 .badge-admin { 
@@ -1302,6 +1310,10 @@ img {
 .badge-completed {
   background: var(--gray);
   color: var(--white);
+}
+
+.cell-nowrap {
+  white-space: nowrap;
 }
 
 /* Table action buttons with solid fills */
@@ -1501,9 +1513,7 @@ img {
   color: var(--emerald-green);
 }
 
-/* =======================================================
-   PAYMENT WORKFLOW & PROOF VERIFICATION STYLES
-   ======================================================= */
+/* Payment workflow & proof verification styles */
 .payment-option-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
