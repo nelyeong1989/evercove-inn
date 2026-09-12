@@ -127,13 +127,13 @@ try {
             <label class="payment-card" onclick="selectPayment(this, 'gcash')">
               <input type="radio" name="payment_method" value="GCash (Online)">
               <div class="payment-icon-wrap">
-                <img src="images/gcash-logo.jpg" alt="GCash" onerror="this.onerror=null;this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/GCash_logo.svg/320px-GCash_logo.svg.png';">
+                <img src="images/gcash-logo.png" alt="GCash" onerror="this.onerror=null;this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/GCash_logo.svg/320px-GCash_logo.svg.png';">
               </div>
               <div class="payment-title">GCash Express</div>
               <div class="payment-sub">Scan QR or Send Money</div>
             </label>
 
-            <!-- Credit / Debit Card (Emoji) -->
+            <!-- Credit / Debit Card -->
             <label class="payment-card" onclick="selectPayment(this, 'card')">
               <input type="radio" name="payment_method" value="Card (Online)">
               <div class="payment-icon-wrap">
@@ -161,7 +161,7 @@ try {
           <div class="payment-details-box" id="box-gcash">
             <div class="company-bank-badge">
               <div style="display:flex; align-items:center; gap: 0.6rem;">
-                <img src="images/gcash-logo.jpg" alt="GCash" style="height: 22px;" onerror="this.onerror=null;this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/GCash_logo.svg/320px-GCash_logo.svg.png';">
+                <img src="images/gcash-logo.png" alt="GCash" style="height: 22px;" onerror="this.onerror=null;this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/GCash_logo.svg/320px-GCash_logo.svg.png';">
                 <strong style="color: var(--emerald-green); font-size: 0.92rem;">Official Evercove GCash Account</strong>
               </div>
               <span class="badge badge-confirmed">Verified Merchant</span>
@@ -174,12 +174,12 @@ try {
               </div>
               <div>
                 <span>GCash Mobile Number</span>
-                <strong>0917 000 1234</strong>
+                <strong>0928 855 7646</strong>
               </div>
             </div>
 
             <p style="font-size: 0.78rem; color: var(--gray); line-height: 1.4;">
-              <strong>Step 1:</strong> Send payment using your GCash app to the official number above.<br>
+              <strong>Step 1:</strong> Send payment using your GCash app to <strong>0928 855 7646</strong>.<br>
               <strong>Step 2:</strong> Enter your 13-digit Reference Number and attach a screenshot of your payment receipt below.
             </p>
 
@@ -200,7 +200,7 @@ try {
             <div class="company-bank-badge">
               <div style="display: flex; align-items: center; gap: 0.5rem;">
                 <span style="font-size: 1.3rem;">💳</span>
-                <strong style="color: var(--emerald-green); font-size: 0.92rem;">Official Corporate Bank Account (BDO)</strong>
+                <strong style="color: var(--emerald-green); font-size: 0.92rem;">Official Corporate Bank Account (BPI)</strong>
               </div>
               <span class="badge badge-confirmed">Online Banking</span>
             </div>
@@ -208,7 +208,7 @@ try {
             <div class="company-info-row">
               <div>
                 <span>Bank Partner</span>
-                <strong>BDO Unibank (Valencia Branch)</strong>
+                <strong>BPI (Bank of the Philippine Islands)</strong>
               </div>
               <div>
                 <span>Account Name</span>
@@ -216,7 +216,7 @@ try {
               </div>
               <div>
                 <span>Account Number</span>
-                <strong>1092-3456-7890</strong>
+                <strong>9219-4214-16</strong>
               </div>
               <div>
                 <span>Account Type</span>
@@ -225,12 +225,12 @@ try {
             </div>
 
             <p style="font-size: 0.78rem; color: var(--gray); line-height: 1.4;">
-              Transfer funds via BDO Online, InstaPay, or any mobile bank transfer app. Provide the transaction number and confirmation screenshot below.
+              Transfer funds to BPI Account <strong>9219-4214-16</strong> via BPI Online, Vybe, InstaPay, or Pesonet. Provide the transaction number and confirmation screenshot below.
             </p>
 
             <div class="proof-upload-zone">
               <div class="booking-input-group" style="margin-bottom: 0.9rem;">
-                <label for="card_ref">Bank / Card Transaction Reference Number</label>
+                <label for="card_ref">BPI / Transfer Reference Number</label>
                 <input type="text" id="card_ref" name="card_ref" placeholder="e.g. FT-982341908" maxlength="40">
               </div>
 
