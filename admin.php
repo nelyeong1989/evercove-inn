@@ -125,10 +125,14 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
             $today = date('Y-m-d');
             $isPastStay = ($b['checkout_date'] < $today);
             $payStatus = $b['payment_status'] ?? 'Pending (Due at Check-in)';
-            $isPaid = (strpos($payStatus, 'Paid (Verified)') !== false);
+            $isPaid = (strpos($payStatus, 'Paid') !== false);
           ?>
           <tr>
-            <td><strong>#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?></strong></td>
+            <td>
+              <a href="booking-success.php?id=<?= $b['id'] ?>" target="_blank" style="color: var(--emerald-green); text-decoration: underline;" title="View Voucher Receipt">
+                <strong>#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?></strong>
+              </a>
+            </td>
             <td><?= htmlspecialchars($b['guest_name']) ?><br><small><?= htmlspecialchars($b['guest_email']) ?></small></td>
             <td><strong><?= htmlspecialchars($b['room_name']) ?></strong></td>
             <td><?= htmlspecialchars($b['checkin_date']) ?> to <?= htmlspecialchars($b['checkout_date']) ?></td>
@@ -159,6 +163,8 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
               <?php endif; ?>
             </td>
             <td style="text-align: right; white-space: nowrap;">
+              <a href="booking-success.php?id=<?= $b['id'] ?>" target="_blank" class="btn-action-view" style="margin-right: 4px;">Receipt</a>
+
               <?php if ($b['status'] === 'confirmed' && !$isPaid): ?>
                 <a href="function.php?action=confirm-payment&id=<?= $b['id'] ?>" 
                    class="btn btn-green btn-sm" 

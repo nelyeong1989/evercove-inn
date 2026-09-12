@@ -103,11 +103,16 @@ $isOnlinePaid = (strpos($payStatus, 'Paid') !== false);
     </tr>
   </table>
 
-  <!-- Receipt Action Buttons -->
+  <!-- Role-Aware Receipt Action Buttons -->
   <div class="user-badge" style="justify-content: center; flex-wrap: wrap; gap: 0.6rem;">
-    <a href="my-bookings.php" class="btn btn-gold">View My Bookings</a>
+    <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
+      <a href="admin.php" class="btn btn-green">Management Console</a>
+    <?php else: ?>
+      <a href="my-bookings.php" class="btn btn-gold">View My Bookings</a>
+      <a href="index.php" class="btn btn-green">Return to Home</a>
+    <?php endif; ?>
+
     <button type="button" onclick="window.print()" class="btn btn-sage">Print Receipt</button>
-    <a href="index.php" class="btn btn-green">Return to Home</a>
   </div>
 </div>
 
