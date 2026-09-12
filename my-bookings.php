@@ -106,7 +106,7 @@ try {
             $today = date('Y-m-d');
             $isPastStay = ($b['checkout_date'] < $today);
             $payStatus = $b['payment_status'] ?? 'Pending (Due at Check-in)';
-            $isPaid = (strpos($payStatus, 'Paid') !== false);
+            $isPaid = (strpos($payStatus, 'Paid (Verified)') !== false);
           ?>
           <tr>
             <td><strong>#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?></strong></td>
@@ -121,10 +121,15 @@ try {
             <td><?= htmlspecialchars($b['guests_count']) ?></td>
             <td><strong>₱<?= number_format($b['total_amount'], 2) ?></strong></td>
             <td>
-              <small style="color: var(--gray); display: block;"><?= htmlspecialchars($b['payment_method'] ?? 'Pay on Check-in') ?></small>
+              <small style="color: var(--gray); display: block; font-weight: 600;"><?= htmlspecialchars($b['payment_method'] ?? 'Pay on Check-in') ?></small>
               <span class="badge" style="background: <?= $isPaid ? 'var(--forest-green)' : 'var(--warm-gold)' ?>; color: #fff; font-size: 0.65rem;">
                 <?= htmlspecialchars($payStatus) ?>
               </span>
+              <?php if (!empty($b['payment_ref'])): ?>
+                <small style="display: block; color: var(--emerald-green); font-family: monospace; margin-top: 2px;">
+                  Ref: <?= htmlspecialchars($b['payment_ref']) ?>
+                </small>
+              <?php endif; ?>
             </td>
             <td>
               <?php if ($b['status'] === 'cancelled'): ?>

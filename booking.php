@@ -38,57 +38,6 @@ try {
   <meta charset="UTF-8">
   <title>Reserve Your Stay — Evercove Inn & Suites</title>
   <link rel="stylesheet" href="style.css?v=<?php echo time(); ?>">
-  <style>
-    .payment-option-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0.8rem;
-      margin-top: 0.4rem;
-    }
-    .payment-card {
-      border: 1.5px solid rgba(188, 148, 86, 0.35);
-      border-radius: 8px;
-      padding: 0.9rem;
-      text-align: center;
-      background: #ffffff;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    .payment-card:hover {
-      border-color: var(--emerald-green);
-    }
-    .payment-card.active {
-      border-color: var(--emerald-green);
-      background: rgba(39, 77, 58, 0.06);
-      box-shadow: 0 0 0 2px var(--emerald-green);
-    }
-    .payment-card input[type="radio"] {
-      display: none;
-    }
-    .payment-icon {
-      font-size: 1.3rem;
-      margin-bottom: 0.2rem;
-    }
-    .payment-title {
-      font-size: 0.78rem;
-      font-weight: 700;
-      color: var(--emerald-green);
-    }
-    .payment-sub {
-      font-size: 0.68rem;
-      color: var(--gray);
-      margin-top: 0.15rem;
-    }
-    .payment-instructions {
-      background: #fbf5ee;
-      border: 1px dashed rgba(188, 148, 86, 0.5);
-      border-radius: 6px;
-      padding: 0.85rem 1rem;
-      font-size: 0.8rem;
-      color: var(--charcoal);
-      margin-top: 0.8rem;
-    }
-  </style>
 </head>
 <body>
 
@@ -128,7 +77,7 @@ try {
       <p style="color: var(--gray); font-size: 0.95rem; margin-top: 0.4rem;">Select your preferred dates, room, and payment method below.</p>
     </div>
 
-    <form method="POST" action="function.php">
+    <form method="POST" action="function.php" enctype="multipart/form-data">
       <div class="booking-form-grid">
         <div class="booking-input-group full-width">
           <label for="room_id">Select Room / Suite</label>
@@ -163,31 +112,132 @@ try {
         <div class="booking-input-group full-width">
           <label>Select Payment Option</label>
           <div class="payment-option-grid">
+            
+            <!-- Pay on Check-in -->
             <label class="payment-card active" onclick="selectPayment(this, 'checkin')">
               <input type="radio" name="payment_method" value="Pay on Check-in" checked>
-              <div class="payment-icon">🏨</div>
+              <div class="payment-icon-wrap">
+                <span style="font-size: 1.5rem;">🏨</span>
+              </div>
               <div class="payment-title">Pay on Check-in</div>
-              <div class="payment-sub">Cash / Card at desk</div>
+              <div class="payment-sub">Cash / Card at front desk</div>
             </label>
 
+            <!-- GCash -->
             <label class="payment-card" onclick="selectPayment(this, 'gcash')">
               <input type="radio" name="payment_method" value="GCash (Online)">
-              <div class="payment-icon">📱</div>
-              <div class="payment-title">GCash</div>
-              <div class="payment-sub">Instant e-Wallet</div>
+              <div class="payment-icon-wrap">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/GCash_logo.svg/320px-GCash_logo.svg.png" alt="GCash">
+              </div>
+              <div class="payment-title">GCash Express</div>
+              <div class="payment-sub">Scan QR or Send Money</div>
             </label>
 
+            <!-- Credit / Debit Card -->
             <label class="payment-card" onclick="selectPayment(this, 'card')">
               <input type="radio" name="payment_method" value="Card (Online)">
-              <div class="payment-icon">💳</div>
-              <div class="payment-title">Credit / Debit</div>
-              <div class="payment-sub">Visa / Mastercard</div>
+              <div class="payment-icon-wrap">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/320px-Mastercard-logo.svg.png" alt="Mastercard" style="height: 18px; margin-right: 4px;">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/320px-Visa_Inc._logo.svg.png" alt="Visa" style="height: 12px;">
+              </div>
+              <div class="payment-title">Bank / Card</div>
+              <div class="payment-sub">Direct Bank Deposit</div>
             </label>
           </div>
 
-          <div class="payment-instructions" id="payment-note">
-            Settle your bill directly at our Valencia front desk when you arrive. No advance payment required today.
+          <!-- Pay on Check-in Details Box -->
+          <div class="payment-details-box active" id="box-checkin">
+            <div style="display: flex; align-items: center; gap: 0.8rem;">
+              <span style="font-size: 1.5rem;">🛎️</span>
+              <div>
+                <strong style="color: var(--emerald-green); font-size: 0.95rem;">Pay Upon Arrival</strong>
+                <p style="font-size: 0.82rem; color: var(--gray); margin-top: 0.2rem;">
+                  No advance payment required today. Your reservation will be confirmed and settled at our Valencia front desk via cash, credit, or debit card upon check-in.
+                </p>
+              </div>
+            </div>
           </div>
+
+          <!-- GCash Details & Verification Upload Box -->
+          <div class="payment-details-box" id="box-gcash">
+            <div class="company-bank-badge">
+              <div style="display:flex; align-items:center; gap: 0.6rem;">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/GCash_logo.svg/320px-GCash_logo.svg.png" alt="GCash" style="height: 22px;">
+                <strong style="color: var(--emerald-green); font-size: 0.92rem;">Official Evercove GCash Account</strong>
+              </div>
+              <span class="badge badge-confirmed" style="font-size: 0.65rem;">Verified Merchant</span>
+            </div>
+
+            <div class="company-info-row">
+              <div>
+                <span>Account Name</span>
+                <strong>Evercove Inn &amp; Suites</strong>
+              </div>
+              <div>
+                <span>GCash Mobile Number</span>
+                <strong>0917 000 1234</strong>
+              </div>
+            </div>
+
+            <p style="font-size: 0.78rem; color: var(--gray); line-height: 1.4;">
+              <strong>Step 1:</strong> Send payment using your GCash app to the official number above.<br>
+              <strong>Step 2:</strong> Enter your 13-digit Reference Number and attach a screenshot of your payment receipt below.
+            </p>
+
+            <div class="proof-upload-zone">
+              <div class="booking-input-group" style="margin-bottom: 0.9rem;">
+                <label for="gcash_ref">GCash Reference Number</label>
+                <input type="text" id="gcash_ref" name="gcash_ref" placeholder="e.g. 901234567890" maxlength="30">
+              </div>
+
+              <label for="gcash_proof">Upload GCash Payment Screenshot</label>
+              <input type="file" id="gcash_proof" name="gcash_proof" class="file-input-custom" accept="image/png, image/jpeg, image/jpg, image/webp" onchange="previewImage(this, 'preview-gcash')">
+              <img id="preview-gcash" class="preview-thumbnail" alt="Receipt Preview">
+            </div>
+          </div>
+
+          <!-- Bank / Card Details & Verification Box -->
+          <div class="payment-details-box" id="box-card">
+            <div class="company-bank-badge">
+              <strong style="color: var(--emerald-green); font-size: 0.92rem;">Official Corporate Bank Account (BDO)</strong>
+              <span class="badge badge-confirmed" style="font-size: 0.65rem;">Online Banking</span>
+            </div>
+
+            <div class="company-info-row">
+              <div>
+                <span>Bank Partner</span>
+                <strong>BDO Unibank (Valencia Branch)</strong>
+              </div>
+              <div>
+                <span>Account Name</span>
+                <strong>Evercove Inn &amp; Suites Inc.</strong>
+              </div>
+              <div>
+                <span>Account Number</span>
+                <strong>1092-3456-7890</strong>
+              </div>
+              <div>
+                <span>Account Type</span>
+                <strong>Corporate Savings</strong>
+              </div>
+            </div>
+
+            <p style="font-size: 0.78rem; color: var(--gray); line-height: 1.4;">
+              Transfer funds via BDO Online, InstaPay, or any mobile bank transfer app. Provide the transaction number and confirmation screenshot below.
+            </p>
+
+            <div class="proof-upload-zone">
+              <div class="booking-input-group" style="margin-bottom: 0.9rem;">
+                <label for="card_ref">Bank / Card Transaction Reference Number</label>
+                <input type="text" id="card_ref" name="card_ref" placeholder="e.g. FT-982341908" maxlength="40">
+              </div>
+
+              <label for="card_proof">Upload Bank Transfer Slip / Confirmation</label>
+              <input type="file" id="card_proof" name="card_proof" class="file-input-custom" accept="image/png, image/jpeg, image/jpg, image/webp" onchange="previewImage(this, 'preview-card')">
+              <img id="preview-card" class="preview-thumbnail" alt="Deposit Slip Preview">
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -221,13 +271,44 @@ try {
     cardElement.classList.add('active');
     cardElement.querySelector('input[type="radio"]').checked = true;
 
-    const note = document.getElementById('payment-note');
-    if (mode === 'checkin') {
-      note.textContent = "Settle your bill directly at our Valencia front desk when you arrive. No advance payment required today.";
-    } else if (mode === 'gcash') {
-      note.innerHTML = "<strong>GCash Online:</strong> Reservation will be marked <strong>Paid (Online)</strong>. Simulated transaction reference: <code>#GC-" + Math.floor(100000 + Math.random() * 900000) + "</code>.";
+    document.querySelectorAll('.payment-details-box').forEach(b => b.classList.remove('active'));
+    const targetBox = document.getElementById('box-' + mode);
+    if (targetBox) targetBox.classList.add('active');
+
+    const gcashRef = document.getElementById('gcash_ref');
+    const gcashProof = document.getElementById('gcash_proof');
+    const cardRef = document.getElementById('card_ref');
+    const cardProof = document.getElementById('card_proof');
+
+    if (mode === 'gcash') {
+      if (gcashRef) gcashRef.required = true;
+      if (gcashProof) gcashProof.required = true;
+      if (cardRef) cardRef.required = false;
+      if (cardProof) cardProof.required = false;
     } else if (mode === 'card') {
-      note.innerHTML = "<strong>Card Online:</strong> Secured via encrypted mock gateway. Reservation will be confirmed as <strong>Paid (Online)</strong> immediately.";
+      if (cardRef) cardRef.required = true;
+      if (cardProof) cardProof.required = true;
+      if (gcashRef) gcashRef.required = false;
+      if (gcashProof) gcashProof.required = false;
+    } else {
+      if (gcashRef) gcashRef.required = false;
+      if (gcashProof) gcashProof.required = false;
+      if (cardRef) cardRef.required = false;
+      if (cardProof) cardProof.required = false;
+    }
+  }
+
+  function previewImage(input, previewId) {
+    const preview = document.getElementById(previewId);
+    if (input.files && input.files[0]) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        preview.src = e.target.result;
+        preview.style.display = 'block';
+      };
+      reader.readAsDataURL(input.files[0]);
+    } else {
+      preview.style.display = 'none';
     }
   }
 

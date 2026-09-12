@@ -125,7 +125,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
             $today = date('Y-m-d');
             $isPastStay = ($b['checkout_date'] < $today);
             $payStatus = $b['payment_status'] ?? 'Pending (Due at Check-in)';
-            $isPaid = (strpos($payStatus, 'Paid') !== false);
+            $isPaid = (strpos($payStatus, 'Paid (Verified)') !== false);
           ?>
           <tr>
             <td><strong>#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?></strong></td>
@@ -134,10 +134,20 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
             <td><?= htmlspecialchars($b['checkin_date']) ?> to <?= htmlspecialchars($b['checkout_date']) ?></td>
             <td><strong>&#8369;<?= number_format($b['total_amount'], 2) ?></strong></td>
             <td>
-              <small style="color: var(--gray); display: block;"><?= htmlspecialchars($b['payment_method'] ?? 'Pay on Check-in') ?></small>
+              <small style="color: var(--gray); display: block; font-weight: 600;"><?= htmlspecialchars($b['payment_method'] ?? 'Pay on Check-in') ?></small>
               <span class="badge" style="background: <?= $isPaid ? 'var(--forest-green)' : 'var(--warm-gold)' ?>; color: #fff; font-size: 0.65rem;">
                 <?= htmlspecialchars($payStatus) ?>
               </span>
+              <?php if (!empty($b['payment_ref'])): ?>
+                <small style="display: block; color: var(--emerald-green); font-family: monospace; margin-top: 2px;">
+                  Ref: <?= htmlspecialchars($b['payment_ref']) ?>
+                </small>
+              <?php endif; ?>
+              <?php if (!empty($b['payment_proof'])): ?>
+                <a href="<?= htmlspecialchars($b['payment_proof']) ?>" target="_blank" style="display: inline-block; font-size: 0.68rem; font-weight: 700; color: var(--gold-dark); text-decoration: underline; margin-top: 3px;">
+                  🔍 View Screenshot
+                </a>
+              <?php endif; ?>
             </td>
             <td>
               <?php if ($b['status'] === 'cancelled'): ?>
@@ -153,7 +163,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
                 <a href="function.php?action=confirm-payment&id=<?= $b['id'] ?>" 
                    class="btn btn-green btn-sm" 
                    style="padding: 0.35rem 0.6rem; font-size: 0.68rem; margin-right: 4px;"
-                   onclick="return confirm('Confirm guest payment for this reservation?');">
+                   onclick="return confirm('Confirm verified payment for this reservation?');">
                   Mark Paid
                 </a>
               <?php endif; ?>

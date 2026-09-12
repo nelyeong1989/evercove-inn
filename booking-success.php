@@ -73,6 +73,12 @@ $isOnlinePaid = (strpos($payStatus, 'Paid') !== false);
       <th>Payment Method</th>
       <td><?= htmlspecialchars($booking['payment_method'] ?? 'Pay on Check-in') ?></td>
     </tr>
+    <?php if (!empty($booking['payment_ref'])): ?>
+    <tr>
+      <th>Payment Reference</th>
+      <td><code style="font-size: 0.9rem; color: var(--emerald-green);"><?= htmlspecialchars($booking['payment_ref']) ?></code></td>
+    </tr>
+    <?php endif; ?>
     <tr>
       <th>Payment Status</th>
       <td>
@@ -81,6 +87,16 @@ $isOnlinePaid = (strpos($payStatus, 'Paid') !== false);
         </span>
       </td>
     </tr>
+    <?php if (!empty($booking['payment_proof'])): ?>
+    <tr>
+      <th>Receipt Proof</th>
+      <td>
+        <a href="<?= htmlspecialchars($booking['payment_proof']) ?>" target="_blank" style="color: var(--gold-dark); text-decoration: underline; font-size: 0.85rem; font-weight: 700;">
+          View Uploaded Screenshot &rsaquo;
+        </a>
+      </td>
+    </tr>
+    <?php endif; ?>
     <tr>
       <th>Total Amount Due</th>
       <td>₱<?= number_format($booking['total_amount'], 2) ?></td>

@@ -114,7 +114,7 @@ if (isset($_POST['reset-password'])) {
     }
 }
 
-// 4. Make a Reservation
+// 4. Make a Reservation with Payment Verification & Proof Screenshot
 if (isset($_POST['book-stay'])) {
     if (!isset($_SESSION['user_id'])) {
         header('Location: login.php?status=error&message=' . urlencode('Please sign in or create an account to book a stay.'));
@@ -171,15 +171,54 @@ if (isset($_POST['book-stay'])) {
         $total  = $nights * (float) $room['price_per_night'];
         $userId = $_SESSION['user_id'];
 
-        // Determine payment method and payment status
+        // Determine payment option, reference, and uploaded proof screenshot
         $rawPayment = trim($_POST['payment_method'] ?? 'Pay on Check-in');
         $validMethods = ['Pay on Check-in', 'GCash (Online)', 'Card (Online)'];
         $paymentMethod = in_array($rawPayment, $validMethods, true) ? $rawPayment : 'Pay on Check-in';
-        $paymentStatus = ($paymentMethod === 'Pay on Check-in') ? 'Pending (Due at Check-in)' : 'Paid (Online)';
+
+        $paymentRef   = null;
+        $paymentProof = null;
+
+        if ($paymentMethod === 'GCash (Online)') {
+            $paymentRef = trim($_POST['gcash_ref'] ?? '');
+            $fileUpload = $_FILES['gcash_proof'] ?? null;
+            $paymentStatus = 'Paid (Under Verification)';
+        } elseif ($paymentMethod === 'Card (Online)') {
+            $paymentRef = trim($_POST['card_ref'] ?? '');
+            $fileUpload = $_FILES['card_proof'] ?? null;
+            $paymentStatus = 'Paid (Under Verification)';
+        } else {
+            $paymentStatus = 'Pending (Due at Check-in)';
+            $fileUpload = null;
+        }
+
+        // Process proof screenshot upload
+        if ($fileUpload && $fileUpload['error'] === UPLOAD_ERR_OK) {
+            $allowedExts = ['jpg', 'jpeg', 'png', 'webp'];
+            $fileInfo    = pathinfo($fileUpload['name']);
+            $extension   = strtolower($fileInfo['extension'] ?? '');
+
+            if (!in_array($extension, $allowedExts, true)) {
+                header('Location: booking.php?status=error&message=' . urlencode('Payment proof must be an image (JPG, PNG, or WEBP).'));
+                exit;
+            }
+
+            $uploadDir = __DIR__ . '/uploads/payments/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+
+            $newFileName  = 'proof_' . date('Ymd_His') . '_' . uniqid() . '.' . $extension;
+            $targetPath   = $uploadDir . $newFileName;
+
+            if (move_uploaded_file($fileUpload['tmp_name'], $targetPath)) {
+                $paymentProof = 'uploads/payments/' . $newFileName;
+            }
+        }
 
         $stmt = $pdo->prepare("
-            INSERT INTO bookings (user_id, room_id, guest_name, guest_email, checkin_date, checkout_date, guests_count, total_amount, payment_method, payment_status, status) 
-            VALUES (:uid, :rid, :name, :email, :cin, :cout, :guests, :total, :pay_method, :pay_status, 'confirmed')
+            INSERT INTO bookings (user_id, room_id, guest_name, guest_email, checkin_date, checkout_date, guests_count, total_amount, payment_method, payment_status, payment_ref, payment_proof, status) 
+            VALUES (:uid, :rid, :name, :email, :cin, :cout, :guests, :total, :pay_method, :pay_status, :pay_ref, :pay_proof, 'confirmed')
         ");
         $stmt->execute([
             ':uid'        => $userId,
@@ -192,6 +231,8 @@ if (isset($_POST['book-stay'])) {
             ':total'      => $total,
             ':pay_method' => $paymentMethod,
             ':pay_status' => $paymentStatus,
+            ':pay_ref'    => $paymentRef,
+            ':pay_proof'  => $paymentProof,
         ]);
 
         $bookingId = $pdo->lastInsertId();
@@ -203,7 +244,7 @@ if (isset($_POST['book-stay'])) {
     }
 }
 
-// 5. Update Existing Reservation (Safeguarded against in-progress or past stays)
+// 5. Update Existing Reservation
 if (isset($_POST['update-booking'])) {
     if (!isset($_SESSION['user_id'])) {
         header('Location: login.php');
@@ -242,7 +283,6 @@ if (isset($_POST['update-booking'])) {
             exit;
         }
 
-        // Prevent modification if stay has started or already completed
         if ($existingBooking['checkin_date'] <= date('Y-m-d')) {
             header('Location: my-bookings.php?status=error&message=' . urlencode('Active or past stays cannot be modified.'));
             exit;
@@ -307,7 +347,7 @@ if (isset($_POST['update-booking'])) {
     }
 }
 
-// 6. Guest Cancels Own Booking (Restricted to upcoming reservations only)
+// 6. Guest Cancels Own Booking
 if (isset($_GET['action']) && $_GET['action'] === 'user-cancel-booking') {
     if (!isset($_SESSION['user_id'])) {
         header('Location: login.php');
@@ -337,7 +377,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'user-cancel-booking') {
     exit;
 }
 
-// 7. Admin Cancels Booking (Restricted to non-completed stays)
+// 7. Admin Cancels Booking
 if (isset($_GET['action']) && $_GET['action'] === 'cancel-booking') {
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
         header('Location: login.php?status=error&message=' . urlencode('Unauthorized access.'));
@@ -367,7 +407,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'cancel-booking') {
     exit;
 }
 
-// 8. Admin Confirms In-Person Payment
+// 8. Admin Confirms Payment Settlement
 if (isset($_GET['action']) && $_GET['action'] === 'confirm-payment') {
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
         header('Location: login.php?status=error&message=' . urlencode('Unauthorized access.'));
@@ -378,7 +418,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'confirm-payment') {
     if ($bookingId) {
         try {
             $pdo = getConnection();
-            $stmt = $pdo->prepare("UPDATE bookings SET payment_status = 'Paid (Front Desk)' WHERE id = :id AND status = 'confirmed'");
+            $stmt = $pdo->prepare("UPDATE bookings SET payment_status = 'Paid (Verified)' WHERE id = :id AND status = 'confirmed'");
             $stmt->execute([':id' => $bookingId]);
 
             header('Location: admin.php?status=success&message=' . urlencode('Payment confirmed for booking #EVR-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT) . '.'));
@@ -447,7 +487,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete-review') {
     exit;
 }
 
-// 11. Post Anonymous Review (Guests only)
+// 11. Post Anonymous Review
 if (isset($_POST['submit-review'])) {
     if (!isset($_SESSION['user_id'])) {
         header('Location: login.php?status=error&message=' . urlencode('Please sign in to leave a review.'));

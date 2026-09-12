@@ -1500,3 +1500,152 @@ img {
   font-weight: 600;
   color: var(--emerald-green);
 }
+
+/* =======================================================
+   PAYMENT WORKFLOW & PROOF VERIFICATION STYLES
+   ======================================================= */
+.payment-option-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.8rem;
+  margin-top: 0.4rem;
+}
+
+.payment-card {
+  border: 1.5px solid rgba(188, 148, 86, 0.35);
+  border-radius: 8px;
+  padding: 0.9rem 0.5rem;
+  text-align: center;
+  background: var(--white);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.payment-card:hover {
+  border-color: var(--emerald-green);
+}
+
+.payment-card.active {
+  border-color: var(--emerald-green);
+  background: rgba(39, 77, 58, 0.06);
+  box-shadow: 0 0 0 2px var(--emerald-green);
+}
+
+.payment-card input[type="radio"] {
+  display: none;
+}
+
+.payment-icon-wrap {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.35rem;
+}
+
+.payment-icon-wrap img {
+  max-height: 24px;
+  width: auto;
+  object-fit: contain;
+}
+
+.payment-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--emerald-green);
+}
+
+.payment-sub {
+  font-size: 0.68rem;
+  color: var(--gray);
+  margin-top: 0.15rem;
+}
+
+.payment-details-box {
+  background: var(--cream-light);
+  border: 1.5px solid rgba(188, 148, 86, 0.4);
+  border-radius: 10px;
+  padding: 1.2rem 1.4rem;
+  margin-top: 1rem;
+  display: none;
+}
+
+.payment-details-box.active {
+  display: block;
+  animation: fadeIn 0.25s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.company-bank-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px dashed rgba(188, 148, 86, 0.35);
+  padding-bottom: 0.8rem;
+  margin-bottom: 0.9rem;
+}
+
+.company-info-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+  font-size: 0.82rem;
+  margin-bottom: 0.9rem;
+}
+
+.company-info-row div span {
+  display: block;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  color: var(--gold-dark);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.company-info-row div strong {
+  font-size: 0.92rem;
+  color: var(--emerald-green);
+}
+
+.proof-upload-zone {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(188, 148, 86, 0.25);
+}
+
+.proof-upload-zone label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--gold-dark);
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.file-input-custom {
+  width: 100%;
+  background: var(--white);
+  padding: 0.6rem;
+  border: 1.5px dashed rgba(39, 77, 58, 0.4);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.preview-thumbnail {
+  max-height: 120px;
+  max-width: 180px;
+  margin-top: 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #d4c8b8;
+  display: none;
+}
