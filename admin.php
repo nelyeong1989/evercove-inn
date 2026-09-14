@@ -240,10 +240,10 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
                 <strong><?= htmlspecialchars($b['room_name']) ?></strong>
               </td>
               <td class="cell-nowrap" style="font-size: 0.76rem; color: #3d3a30;">
-                <?= date('M j', strtotime($b['checkin_date'])) ?> &ndash; <?= date('M j, Y', strtotime($b['checkout_date'])) ?>
+                <span class="booking-dates-display"><?= date('M j', strtotime($b['checkin_date'])) ?> &ndash; <?= date('M j, Y', strtotime($b['checkout_date'])) ?></span>
               </td>
               <td class="cell-nowrap">
-                <strong>&#8369;<?= number_format($b['total_amount'], 2) ?></strong>
+                <strong class="booking-total-display">&#8369;<?= number_format($b['total_amount'], 2) ?></strong>
               </td>
               <td>
                 <small style="color: var(--gray); display: block; font-weight: 600; white-space: nowrap; font-size: 0.7rem; margin-bottom: 2px;">
@@ -283,6 +283,16 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
                      style="padding: 0.32rem 0.5rem; font-size: 0.66rem; margin-right: 3px;"
                      onclick="return confirm('Confirm verified payment for this reservation?');">
                     Mark Paid
+                  </a>
+                <?php endif; ?>
+
+                <!-- Early Check-Out Button for Active In-House Stays -->
+                <?php if ($isInHouse && $b['checkout_date'] > $today): ?>
+                  <a href="function.php?action=early-checkout&id=<?= $b['id'] ?>" 
+                     class="btn btn-sage btn-sm btn-early-checkout" 
+                     style="padding: 0.32rem 0.5rem; font-size: 0.66rem; margin-right: 3px;"
+                     onclick="return confirm('Process early check-out for this guest? This will release the room for new bookings starting today.');">
+                    Check Out
                   </a>
                 <?php endif; ?>
 
@@ -523,6 +533,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
     if (alert) alert.style.display = 'none';
   }
 
+  // Intercept Admin Clicks (Mark Paid, Early Checkout, Cancel, Toggle Room, Delete Review) without reload or double popups
   document.addEventListener('click', async function(e) {
     const link = e.target.closest('a[href*="function.php?action="]');
     if (!link) return;
@@ -532,7 +543,6 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
     const href = link.getAttribute('href');
     if (href.includes('action=logout')) return;
 
-    // Stop native full page navigation
     e.preventDefault();
 
     try {
@@ -562,13 +572,26 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
             const oldFilter = targetRow.getAttribute('data-filter') || '';
             targetRow.setAttribute('data-filter', oldFilter.replace('verify', '').trim());
 
-            // Decrement badge count
             const countBadge = document.getElementById('verifyBadgeCount');
             if (countBadge) {
               const currentVal = parseInt(countBadge.textContent, 10) - 1;
               if (currentVal <= 0) countBadge.remove();
               else countBadge.textContent = currentVal;
             }
+          }
+        }
+
+        // Early Check-Out UI update
+        if (href.includes('action=early-checkout')) {
+          link.remove();
+          if (row) {
+            const statusCell = row.querySelector('td:nth-child(7)');
+            if (statusCell) statusCell.innerHTML = '<span class="badge badge-completed">completed</span>';
+            row.setAttribute('data-filter', 'all completed');
+
+            // Remove cancel button if still present
+            const cancelBtn = row.querySelector('.btn-action-cancel');
+            if (cancelBtn) cancelBtn.remove();
           }
         }
 
@@ -579,6 +602,9 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
             const statusCell = row.querySelector('td:nth-child(7)');
             if (statusCell) statusCell.innerHTML = '<span class="badge badge-cancelled">cancelled</span>';
             row.setAttribute('data-filter', 'all cancelled');
+
+            const checkoutBtn = row.querySelector('.btn-early-checkout');
+            if (checkoutBtn) checkoutBtn.remove();
           }
         }
 

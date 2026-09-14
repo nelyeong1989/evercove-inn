@@ -418,6 +418,55 @@ if (isset($_GET['action']) && $_GET['action'] === 'cancel-booking') {
     sendResponse('error', 'Invalid booking identifier.');
 }
 
+// 7.1 Admin Early Check-Out (Frees up room starting today - AJAX Aware)
+if (isset($_GET['action']) && $_GET['action'] === 'early-checkout') {
+    if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+        sendResponse('error', 'Unauthorized access.', 'login.php');
+    }
+
+    $bookingId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+    if ($bookingId) {
+        try {
+            $pdo = getConnection();
+            $today = date('Y-m-d');
+
+            $stmt = $pdo->prepare("
+                SELECT b.*, r.price_per_night 
+                FROM bookings b 
+                JOIN rooms r ON b.room_id = r.id 
+                WHERE b.id = :id AND b.status = 'confirmed'
+            ");
+            $stmt->execute([':id' => $bookingId]);
+            $b = $stmt->fetch();
+
+            if ($b && $b['checkin_date'] <= $today && $b['checkout_date'] > $today) {
+                $nights = max(1, (int)((strtotime($today) - strtotime($b['checkin_date'])) / 86400));
+                $newTotal = $nights * (float)$b['price_per_night'];
+
+                $upd = $pdo->prepare("
+                    UPDATE bookings 
+                    SET checkout_date = :today,
+                        total_amount = :total
+                    WHERE id = :id
+                ");
+                $upd->execute([
+                    ':today' => $today,
+                    ':total' => $newTotal,
+                    ':id'    => $bookingId
+                ]);
+
+                sendResponse('success', 'Early check-out recorded. Room is now available for new bookings.');
+            } else {
+                sendResponse('error', 'This reservation is not currently active.');
+            }
+        } catch (PDOException $e) {
+            sendResponse('error', $e->getMessage());
+        }
+    }
+
+    sendResponse('error', 'Invalid booking identifier.');
+}
+
 // 8. Admin Confirms Payment Settlement (AJAX Aware)
 if (isset($_GET['action']) && $_GET['action'] === 'confirm-payment') {
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
