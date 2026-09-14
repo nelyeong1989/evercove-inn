@@ -106,7 +106,8 @@ try {
           <?php foreach ($myBookings as $b): ?>
             <?php 
               $today = date('Y-m-d');
-              $isPastStay = ($b['checkout_date'] < $today);
+              // Include 'completed' so early check-outs reflect immediately
+              $isPastStay = ($b['checkout_date'] < $today || $b['status'] === 'completed');
               $payStatus = $b['payment_status'] ?? 'Pending (Due at Check-in)';
               $isPaid = in_array($payStatus, ['Paid (Online)', 'Paid (Verified)', 'Paid (Front Desk)'], true);
             ?>
@@ -151,7 +152,7 @@ try {
                      onclick="return confirm('Are you sure you want to cancel this reservation?');">
                     Cancel
                   </a>
-                <?php elseif ($isPastStay && $b['status'] === 'confirmed'): ?>
+                <?php elseif ($isPastStay && $b['status'] !== 'cancelled'): ?>
                   <a href="reviews.php" class="btn btn-sage btn-sm" style="padding: 0.35rem 0.65rem; font-size: 0.7rem;">Leave Review</a>
                 <?php else: ?>
                   <span style="color: var(--gray); font-size: 0.75rem;">None</span>
