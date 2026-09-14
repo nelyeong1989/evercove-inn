@@ -508,6 +508,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
     if (!alert) {
       alert = document.createElement('div');
       alert.id = 'alert-banner';
+      alert.className = 'system-alert';
       alert.innerHTML = `<span></span><button type="button" class="alert-close" onclick="dismissAlert()">&times;</button>`;
       document.querySelector('.admin-wrap').prepend(alert);
     }
@@ -526,15 +527,13 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
     const link = e.target.closest('a[href*="function.php?action="]');
     if (!link) return;
 
+    if (e.defaultPrevented) return;
+
     const href = link.getAttribute('href');
     if (href.includes('action=logout')) return;
 
+    // Stop native full page navigation
     e.preventDefault();
-
-    if (link.hasAttribute('onclick')) {
-      const confirmMatch = link.getAttribute('onclick').match(/confirm\('([^']+)'\)/);
-      if (confirmMatch && !confirm(confirmMatch[1])) return;
-    }
 
     try {
       const response = await fetch(href + '&ajax=1', {
