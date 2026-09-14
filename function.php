@@ -428,6 +428,12 @@ if (isset($_GET['action']) && in_array($_GET['action'], ['checkout-booking', 'ea
     if ($bookingId) {
         try {
             $pdo = getConnection();
+
+            // Auto-upgrade status column if it's currently restricted to ENUM('confirmed', 'cancelled')
+            try {
+                $pdo->exec("ALTER TABLE bookings MODIFY COLUMN status VARCHAR(20) DEFAULT 'confirmed'");
+            } catch (Exception $colEx) {}
+
             $today = date('Y-m-d');
 
             $stmt = $pdo->prepare("
@@ -444,7 +450,7 @@ if (isset($_GET['action']) && in_array($_GET['action'], ['checkout-booking', 'ea
                     sendResponse('error', 'Guest has not checked in yet.');
                 }
 
-                // If early departure before scheduled checkout, adjust checkout date and recalculate total
+                // If departing earlier than scheduled checkout, adjust checkout date & recalculate amount
                 if ($b['checkout_date'] > $today) {
                     $nights = max(1, (int)((strtotime($today) - strtotime($b['checkin_date'])) / 86400));
                     $newTotal = $nights * (float)$b['price_per_night'];
