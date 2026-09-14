@@ -87,78 +87,81 @@ try {
       <a href="rooms.php" class="btn btn-green">Find Your Room</a>
     </div>
   <?php else: ?>
-    <table class="admin-table">
-      <thead>
-        <tr>
-          <th>Ref</th>
-          <th>Room</th>
-          <th>Dates</th>
-          <th>Guests</th>
-          <th>Total</th>
-          <th>Payment</th>
-          <th>Status</th>
-          <th style="text-align: right;">Manage</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php foreach ($myBookings as $b): ?>
-          <?php 
-            $today = date('Y-m-d');
-            $isPastStay = ($b['checkout_date'] < $today);
-            $payStatus = $b['payment_status'] ?? 'Pending (Due at Check-in)';
-            $isPaid = (strpos($payStatus, 'Paid (Verified)') !== false);
-          ?>
+    <!-- Responsive Table Container -->
+    <div class="table-responsive">
+      <table class="admin-table">
+        <thead>
           <tr>
-            <td><strong>#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?></strong></td>
-            <td>
-              <?= htmlspecialchars($b['room_name']) ?><br>
-              <small style="color: var(--gray);"><?= htmlspecialchars($b['category']) ?></small>
-            </td>
-            <td>
-              <?= date('M j, Y', strtotime($b['checkin_date'])) ?> &rarr; 
-              <?= date('M j, Y', strtotime($b['checkout_date'])) ?>
-            </td>
-            <td><?= htmlspecialchars($b['guests_count']) ?></td>
-            <td><strong>₱<?= number_format($b['total_amount'], 2) ?></strong></td>
-            <td>
-              <small style="color: var(--gray); display: block; font-weight: 600;"><?= htmlspecialchars($b['payment_method'] ?? 'Pay on Check-in') ?></small>
-              <span class="badge" style="background: <?= $isPaid ? 'var(--forest-green)' : 'var(--warm-gold)' ?>; color: #fff; font-size: 0.65rem;">
-                <?= htmlspecialchars($payStatus) ?>
-              </span>
-              <?php if (!empty($b['payment_ref'])): ?>
-                <small style="display: block; color: var(--emerald-green); font-family: monospace; margin-top: 2px;">
-                  Ref: <?= htmlspecialchars($b['payment_ref']) ?>
-                </small>
-              <?php endif; ?>
-            </td>
-            <td>
-              <?php if ($b['status'] === 'cancelled'): ?>
-                <span class="badge badge-cancelled">Cancelled</span>
-              <?php elseif ($isPastStay): ?>
-                <span class="badge badge-completed">Completed</span>
-              <?php else: ?>
-                <span class="badge badge-confirmed">Confirmed</span>
-              <?php endif; ?>
-            </td>
-            <td style="text-align: right; white-space: nowrap;">
-              <a href="booking-success.php?id=<?= $b['id'] ?>" class="btn-action-view" style="margin-right: 4px;">Receipt</a>
-              <?php if ($b['status'] === 'confirmed' && !$isPastStay): ?>
-                <a href="edit-booking.php?id=<?= $b['id'] ?>" class="btn-action-edit" style="margin-right: 4px;">Modify</a>
-                <a href="function.php?action=user-cancel-booking&id=<?= $b['id'] ?>" 
-                   class="btn-action-cancel" 
-                   onclick="return confirm('Are you sure you want to cancel this reservation?');">
-                  Cancel
-                </a>
-              <?php elseif ($isPastStay && $b['status'] === 'confirmed'): ?>
-                <a href="reviews.php" class="btn btn-sage btn-sm" style="padding: 0.35rem 0.65rem; font-size: 0.7rem;">Leave Review</a>
-              <?php else: ?>
-                <span style="color: var(--gray); font-size: 0.75rem;">None</span>
-              <?php endif; ?>
-            </td>
+            <th>Ref</th>
+            <th>Room</th>
+            <th>Dates</th>
+            <th>Guests</th>
+            <th>Total</th>
+            <th>Payment</th>
+            <th>Status</th>
+            <th style="text-align: right;">Manage</th>
           </tr>
-        <?php endforeach; ?>
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          <?php foreach ($myBookings as $b): ?>
+            <?php 
+              $today = date('Y-m-d');
+              $isPastStay = ($b['checkout_date'] < $today);
+              $payStatus = $b['payment_status'] ?? 'Pending (Due at Check-in)';
+              $isPaid = in_array($payStatus, ['Paid (Online)', 'Paid (Verified)', 'Paid (Front Desk)'], true);
+            ?>
+            <tr>
+              <td class="cell-nowrap"><strong>#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?></strong></td>
+              <td>
+                <?= htmlspecialchars($b['room_name']) ?><br>
+                <small style="color: var(--gray);"><?= htmlspecialchars($b['category']) ?></small>
+              </td>
+              <td class="cell-nowrap">
+                <?= date('M j, Y', strtotime($b['checkin_date'])) ?> &rarr; 
+                <?= date('M j, Y', strtotime($b['checkout_date'])) ?>
+              </td>
+              <td><?= htmlspecialchars($b['guests_count']) ?></td>
+              <td class="cell-nowrap"><strong>₱<?= number_format($b['total_amount'], 2) ?></strong></td>
+              <td>
+                <small style="color: var(--gray); display: block; font-weight: 600;"><?= htmlspecialchars($b['payment_method'] ?? 'Pay on Check-in') ?></small>
+                <span class="badge" style="background: <?= $isPaid ? 'var(--forest-green)' : 'var(--warm-gold)' ?>; color: #fff; font-size: 0.65rem;">
+                  <?= htmlspecialchars($payStatus) ?>
+                </span>
+                <?php if (!empty($b['payment_ref'])): ?>
+                  <small style="display: block; color: var(--emerald-green); font-family: monospace; margin-top: 2px;">
+                    Ref: <?= htmlspecialchars($b['payment_ref']) ?>
+                  </small>
+                <?php endif; ?>
+              </td>
+              <td class="cell-nowrap">
+                <?php if ($b['status'] === 'cancelled'): ?>
+                  <span class="badge badge-cancelled">Cancelled</span>
+                <?php elseif ($isPastStay): ?>
+                  <span class="badge badge-completed">Completed</span>
+                <?php else: ?>
+                  <span class="badge badge-confirmed">Confirmed</span>
+                <?php endif; ?>
+              </td>
+              <td class="cell-nowrap" style="text-align: right; white-space: nowrap;">
+                <a href="booking-success.php?id=<?= $b['id'] ?>" class="btn-action-view" style="margin-right: 4px;">Receipt</a>
+                <?php if ($b['status'] === 'confirmed' && !$isPastStay): ?>
+                  <a href="edit-booking.php?id=<?= $b['id'] ?>" class="btn-action-edit" style="margin-right: 4px;">Modify</a>
+                  <a href="function.php?action=user-cancel-booking&id=<?= $b['id'] ?>" 
+                     class="btn-action-cancel" 
+                     onclick="return confirm('Are you sure you want to cancel this reservation?');">
+                    Cancel
+                  </a>
+                <?php elseif ($isPastStay && $b['status'] === 'confirmed'): ?>
+                  <a href="reviews.php" class="btn btn-sage btn-sm" style="padding: 0.35rem 0.65rem; font-size: 0.7rem;">Leave Review</a>
+                <?php else: ?>
+                  <span style="color: var(--gray); font-size: 0.75rem;">None</span>
+                <?php endif; ?>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
   <?php endif; ?>
 </div>
 
