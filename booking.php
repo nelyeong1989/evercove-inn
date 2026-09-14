@@ -26,7 +26,20 @@ $guestsParam    = filter_input(INPUT_GET, 'guests', FILTER_VALIDATE_INT);
 
 try {
     $pdo = getConnection();
-    // Only fetch rooms that are currently active/available
+
+    // Check if directly requested room via URL is undergoing maintenance
+    if ($selectedRoomId) {
+        $chkStmt = $pdo->prepare("SELECT name, is_available FROM rooms WHERE id = :id");
+        $chkStmt->execute([':id' => $selectedRoomId]);
+        $requestedRoom = $chkStmt->fetch();
+
+        if ($requestedRoom && ($requestedRoom['is_available'] ?? 1) == 0) {
+            header('Location: rooms.php?status=error&message=' . urlencode($requestedRoom['name'] . ' is currently undergoing maintenance and unavailable for booking.'));
+            exit;
+        }
+    }
+
+    // Only load rooms that are available for reservation
     $stmt = $pdo->query("SELECT * FROM rooms WHERE is_available = 1 ORDER BY id ASC");
     $rooms = $stmt->fetchAll();
 } catch (Exception $e) {

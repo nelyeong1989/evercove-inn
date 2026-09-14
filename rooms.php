@@ -13,7 +13,7 @@ try {
     $rooms = [];
 }
 
-// room inclusions
+// Room inclusions
 function getRoomInclusions(string $category): array {
     switch (trim($category)) {
         case 'Single Room':
@@ -111,12 +111,19 @@ function getRoomInclusions(string $category): array {
     <!-- Dynamic Room Grid -->
     <div class="room-grid" id="room-grid">
       <?php foreach ($rooms as $room): ?>
-        <div class="room-card" data-category="<?= htmlspecialchars($room['category']) ?>">
+        <?php $isAvail = ($room['is_available'] ?? 1) == 1; ?>
+        <div class="room-card" data-category="<?= htmlspecialchars($room['category']) ?>" style="<?= !$isAvail ? 'opacity: 0.82;' : '' ?>">
           
           <!-- Photo Container with Inclusions Overlay -->
           <div class="room-card-media">
             <img src="<?= htmlspecialchars($room['image_path']) ?>" alt="<?= htmlspecialchars($room['name']) ?>">
             
+            <?php if (!$isAvail): ?>
+              <div style="position: absolute; top: 10px; right: 10px; z-index: 3;">
+                <span class="badge badge-cancelled" style="font-size: 0.65rem; box-shadow: 0 2px 8px rgba(0,0,0,0.35);">Maintenance</span>
+              </div>
+            <?php endif; ?>
+
             <div class="room-inclusions-sheet" id="sheet-<?= $room['id'] ?>">
               <button type="button" class="sheet-close" onclick="toggleSheet(<?= $room['id'] ?>)">&times;</button>
               <span class="sheet-eyebrow">Included with stay</span>
@@ -129,14 +136,23 @@ function getRoomInclusions(string $category): array {
           </div>
 
           <div class="room-card-body">
-            <div class="room-cat"><?= htmlspecialchars($room['category']) ?></div>
+            <div class="room-cat">
+              <?= htmlspecialchars($room['category']) ?>
+              <?php if (!$isAvail): ?>
+                <span style="color: var(--danger); font-size: 0.65rem; font-weight: 700; margin-left: 4px;">(Unavailable)</span>
+              <?php endif; ?>
+            </div>
             <h3><?= htmlspecialchars($room['name']) ?></h3>
             <p class="room-price"><strong>&#8369;<?= number_format($room['price_per_night']) ?></strong> / night</p>
             
-            <!-- Action Buttons: Solid Sage & Solid Green -->
+            <!-- Action Buttons: Solid Sage & Booking State -->
             <div class="room-actions-dual">
               <button type="button" class="btn btn-sage btn-sm" onclick="toggleSheet(<?= $room['id'] ?>)">Inclusions</button>
-              <a href="booking.php?room_id=<?= $room['id'] ?>" class="btn btn-green btn-sm">Book Room</a>
+              <?php if ($isAvail): ?>
+                <a href="booking.php?room_id=<?= $room['id'] ?>" class="btn btn-green btn-sm">Book Room</a>
+              <?php else: ?>
+                <button type="button" class="btn btn-sm" style="background: #b5ada3; color: #fff; cursor: not-allowed;" disabled title="Room is currently undergoing maintenance">Maintenance</button>
+              <?php endif; ?>
             </div>
           </div>
         </div>
@@ -157,7 +173,6 @@ function getRoomInclusions(string $category): array {
 </footer>
 
 <script>
-  // Filter rooms by category
   function filterCategory(category, element) {
     document.querySelectorAll('.filter-pill').forEach(btn => btn.classList.remove('active'));
     if (element) element.classList.add('active');
@@ -172,7 +187,6 @@ function getRoomInclusions(string $category): array {
     });
   }
 
-  // Toggle smooth slide-up inclusions sheet
   function toggleSheet(id) {
     const targetSheet = document.getElementById('sheet-' + id);
     const allSheets = document.querySelectorAll('.room-inclusions-sheet');

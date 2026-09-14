@@ -219,7 +219,6 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
               $isPaid = in_array($payStatus, ['Paid (Online)', 'Paid (Verified)', 'Paid (Front Desk)'], true);
               $needsVerify = ($b['status'] === 'confirmed' && $payStatus === 'Paid (Under Verification)');
 
-              // Tag for JS filtering
               $filterTags = ['all'];
               if ($needsVerify) $filterTags[] = 'verify';
               if ($isArrivingToday) $filterTags[] = 'today';
@@ -229,7 +228,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
             ?>
             <tr data-filter="<?= implode(' ', $filterTags) ?>">
               <td class="cell-nowrap">
-                <a href="booking-success.php?id=<?= $b['id'] ?>" target="_blank" style="color: var(--emerald-green); text-decoration: underline;" title="View Voucher Receipt">
+                <a href="booking-success.php?id=<?= $b['id'] ?>" style="color: var(--emerald-green); text-decoration: underline;" title="View Voucher Receipt">
                   <strong>#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?></strong>
                 </a>
               </td>
@@ -276,7 +275,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
                 <?php endif; ?>
               </td>
               <td class="cell-nowrap" style="text-align: right;">
-                <a href="booking-success.php?id=<?= $b['id'] ?>" target="_blank" class="btn-action-view" style="margin-right: 3px;">Receipt</a>
+                <a href="booking-success.php?id=<?= $b['id'] ?>" class="btn-action-view" style="margin-right: 3px;">Receipt</a>
 
                 <?php if ($b['status'] === 'confirmed' && !$isPaid): ?>
                   <a href="function.php?action=confirm-payment&id=<?= $b['id'] ?>" 
@@ -475,7 +474,6 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
     });
   }
 
-  // Lightbox Modal Handlers
   function openProofModal(imgSrc, bookingRef, payRef, bookingId, isPaid) {
     document.getElementById('modalProofImg').src = imgSrc;
     document.getElementById('modalBookingRef').textContent = 'Audit Proof: ' + bookingRef;
@@ -498,7 +496,6 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
     document.getElementById('modalProofImg').src = '';
   }
 
-  // Close modal on escape or background click
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeProofModal();
   });

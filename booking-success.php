@@ -106,7 +106,7 @@ $isOnlinePaid = (strpos($payStatus, 'Paid') !== false);
   <!-- Role-Aware Receipt Action Buttons -->
   <div class="user-badge" style="justify-content: center; flex-wrap: wrap; gap: 0.6rem;">
     <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
-      <a href="admin.php" class="btn btn-green">Management Console</a>
+      <a href="admin.php" class="btn btn-green">&larr; Back to Management Console</a>
     <?php else: ?>
       <a href="my-bookings.php" class="btn btn-gold">View My Bookings</a>
       <a href="index.php" class="btn btn-green">Return to Home</a>
