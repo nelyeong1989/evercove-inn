@@ -135,12 +135,12 @@ if (isset($_POST['book-stay'])) {
     try {
         $pdo = getConnection();
 
-        $roomStmt = $pdo->prepare("SELECT name, category, price_per_night FROM rooms WHERE id = :id");
+        $roomStmt = $pdo->prepare("SELECT name, category, price_per_night, is_available FROM rooms WHERE id = :id");
         $roomStmt->execute([':id' => $result['data']['room_id']]);
         $room = $roomStmt->fetch();
 
-        if (!$room) {
-            header('Location: booking.php?status=error&message=' . urlencode('Selected room does not exist.'));
+        if (!$room || ($room['is_available'] ?? 1) != 1) {
+            header('Location: booking.php?status=error&message=' . urlencode('Selected room is currently unavailable or undergoing maintenance.'));
             exit;
         }
 
@@ -171,7 +171,6 @@ if (isset($_POST['book-stay'])) {
         $total  = $nights * (float) $room['price_per_night'];
         $userId = $_SESSION['user_id'];
 
-        // Determine payment option, reference, and uploaded proof screenshot
         $rawPayment = trim($_POST['payment_method'] ?? 'Pay on Check-in');
         $validMethods = ['Pay on Check-in', 'GCash (Online)', 'Card (Online)'];
         $paymentMethod = in_array($rawPayment, $validMethods, true) ? $rawPayment : 'Pay on Check-in';
@@ -288,9 +287,14 @@ if (isset($_POST['update-booking'])) {
             exit;
         }
 
-        $roomStmt = $pdo->prepare("SELECT name, category, price_per_night FROM rooms WHERE id = :id");
+        $roomStmt = $pdo->prepare("SELECT name, category, price_per_night, is_available FROM rooms WHERE id = :id");
         $roomStmt->execute([':id' => $result['data']['room_id']]);
         $room = $roomStmt->fetch();
+
+        if (!$room || ($room['is_available'] ?? 1) != 1) {
+            header('Location: edit-booking.php?id=' . $bookingId . '&status=error&message=' . urlencode('Selected room is currently undergoing maintenance.'));
+            exit;
+        }
 
         $maxGuests = getRoomMaxGuests($room['category'] ?? '');
         if ($result['data']['guests'] > $maxGuests) {
@@ -458,6 +462,32 @@ if (isset($_POST['update-room-rate'])) {
     }
 
     header('Location: admin.php?status=error&message=' . urlencode('Invalid rate value submitted.'));
+    exit;
+}
+
+// 9.1 Admin Toggles Room Availability (Active vs Maintenance)
+if (isset($_GET['action']) && $_GET['action'] === 'toggle-room-status') {
+    if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+        header('Location: login.php');
+        exit;
+    }
+
+    $roomId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+    if ($roomId) {
+        try {
+            $pdo = getConnection();
+            $stmt = $pdo->prepare("UPDATE rooms SET is_available = CASE WHEN is_available = 1 THEN 0 ELSE 1 END WHERE id = :id");
+            $stmt->execute([':id' => $roomId]);
+
+            header('Location: admin.php?status=success&message=' . urlencode('Room availability toggled successfully.'));
+            exit;
+        } catch (PDOException $e) {
+            header('Location: admin.php?status=error&message=' . urlencode($e->getMessage()));
+            exit;
+        }
+    }
+
+    header('Location: admin.php');
     exit;
 }
 

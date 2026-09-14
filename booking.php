@@ -26,7 +26,8 @@ $guestsParam    = filter_input(INPUT_GET, 'guests', FILTER_VALIDATE_INT);
 
 try {
     $pdo = getConnection();
-    $stmt = $pdo->query("SELECT * FROM rooms ORDER BY id ASC");
+    // Only fetch rooms that are currently active/available
+    $stmt = $pdo->query("SELECT * FROM rooms WHERE is_available = 1 ORDER BY id ASC");
     $rooms = $stmt->fetchAll();
 } catch (Exception $e) {
     $rooms = [];

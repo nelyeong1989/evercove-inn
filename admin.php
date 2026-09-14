@@ -12,12 +12,14 @@ $status  = $_GET['status'] ?? null;
 $message = $_GET['message'] ?? null;
 
 $pdo = getConnection();
+$today = date('Y-m-d');
 
 // 1. Fetch dashboard overview stats
 $revStmt = $pdo->query("SELECT COALESCE(SUM(total_amount), 0) AS total_rev FROM bookings WHERE status = 'confirmed'");
 $totalRevenue = (float)$revStmt->fetchColumn();
 
-$activeStmt = $pdo->query("SELECT COUNT(*) FROM bookings WHERE status = 'confirmed' AND CURRENT_DATE BETWEEN checkin_date AND checkout_date");
+$activeStmt = $pdo->prepare("SELECT COUNT(*) FROM bookings WHERE status = 'confirmed' AND :today BETWEEN checkin_date AND checkout_date");
+$activeStmt->execute([':today' => $today]);
 $activeStays = (int)$activeStmt->fetchColumn();
 
 $confirmedCountStmt = $pdo->query("SELECT COUNT(*) FROM bookings WHERE status = 'confirmed'");
@@ -27,7 +29,32 @@ $ratingStmt = $pdo->query("SELECT AVG(rating) AS avg_score, COUNT(*) AS count FR
 $ratingData = $ratingStmt->fetch();
 $avgRating = ($ratingData && $ratingData['count'] > 0) ? number_format((float)$ratingData['avg_score'], 1) : '5.0';
 
-// 2. Fetch users, rooms, bookings, and reviews
+// 2. Occupancy & Operations
+$totalRoomsCount = (int)$pdo->query("SELECT COUNT(*) FROM rooms")->fetchColumn();
+$occupancyRate = $totalRoomsCount > 0 ? round(($activeStays / $totalRoomsCount) * 100) : 0;
+
+$todayCheckins = $pdo->prepare("
+    SELECT b.*, r.name AS room_name 
+    FROM bookings b 
+    JOIN rooms r ON b.room_id = r.id 
+    WHERE b.checkin_date = :today AND b.status = 'confirmed'
+");
+$todayCheckins->execute([':today' => $today]);
+$arrivals = $todayCheckins->fetchAll();
+
+$todayCheckouts = $pdo->prepare("
+    SELECT b.*, r.name AS room_name 
+    FROM bookings b 
+    JOIN rooms r ON b.room_id = r.id 
+    WHERE b.checkout_date = :today AND b.status = 'confirmed'
+");
+$todayCheckouts->execute([':today' => $today]);
+$departures = $todayCheckouts->fetchAll();
+
+// 3. Needs Verification Count
+$needsVerificationCount = (int)$pdo->query("SELECT COUNT(*) FROM bookings WHERE status = 'confirmed' AND payment_status = 'Paid (Under Verification)'")->fetchColumn();
+
+// 4. Fetch users, rooms, bookings, and reviews
 $users = $pdo->query("SELECT id, username, email, role, created_at FROM users ORDER BY id ASC")->fetchAll();
 $rooms = $pdo->query("SELECT * FROM rooms ORDER BY id ASC")->fetchAll();
 $bookings = $pdo->query("
@@ -76,9 +103,12 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
       <small>Confirmed reservations</small>
     </div>
     <div class="kpi-card">
-      <span class="kpi-label">Active In-House Stays</span>
-      <div class="kpi-number"><?= $activeStays ?></div>
-      <small>Currently checked in</small>
+      <span class="kpi-label">Occupancy Rate</span>
+      <div class="kpi-number"><?= $occupancyRate ?>%</div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" style="width: <?= min(100, $occupancyRate) ?>%;"></div>
+      </div>
+      <small><?= $activeStays ?> of <?= $totalRoomsCount ?> rooms occupied</small>
     </div>
     <div class="kpi-card">
       <span class="kpi-label">Confirmed Bookings</span>
@@ -92,8 +122,55 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
     </div>
   </div>
 
-  <!-- Reservations Header with Instant Search Bar -->
-  <div class="admin-section-head">
+  <!-- Operations Today Panel -->
+  <div class="ops-panel">
+    <div class="ops-col">
+      <div class="ops-title">
+        <span class="ops-dot arrival-dot"></span>
+        <h4>Today's Expected Arrivals (<?= count($arrivals) ?>)</h4>
+      </div>
+      <?php if (empty($arrivals)): ?>
+        <p class="ops-empty">No scheduled check-ins for today.</p>
+      <?php else: ?>
+        <div class="ops-list">
+          <?php foreach ($arrivals as $arr): ?>
+            <div class="ops-item">
+              <div>
+                <strong><?= htmlspecialchars($arr['guest_name']) ?></strong>
+                <small><?= htmlspecialchars($arr['room_name']) ?> &bull; #EVR-<?= str_pad($arr['id'], 5, '0', STR_PAD_LEFT) ?></small>
+              </div>
+              <span class="badge badge-confirmed">Arriving</span>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+
+    <div class="ops-col">
+      <div class="ops-title">
+        <span class="ops-dot departure-dot"></span>
+        <h4>Today's Expected Departures (<?= count($departures) ?>)</h4>
+      </div>
+      <?php if (empty($departures)): ?>
+        <p class="ops-empty">No scheduled check-outs for today.</p>
+      <?php else: ?>
+        <div class="ops-list">
+          <?php foreach ($departures as $dep): ?>
+            <div class="ops-item">
+              <div>
+                <strong><?= htmlspecialchars($dep['guest_name']) ?></strong>
+                <small><?= htmlspecialchars($dep['room_name']) ?> &bull; #EVR-<?= str_pad($dep['id'], 5, '0', STR_PAD_LEFT) ?></small>
+              </div>
+              <span class="badge" style="background: var(--warm-gold); color: #fff;">Check Out</span>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+  </div>
+
+  <!-- Reservations Header with Toolbar & Filter Pills -->
+  <div class="admin-section-head" style="margin-top: 2rem;">
     <div>
       <h3 style="color: var(--emerald-green);">Guest Reservations</h3>
       <p style="color: var(--gray); font-size: 0.85rem;">Manage upcoming arrivals, guest cancellations, and payment settlements.</p>
@@ -103,10 +180,21 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
     </div>
   </div>
 
+  <!-- Filter Pills -->
+  <div class="admin-filter-bar">
+    <button type="button" class="admin-filter-pill active" onclick="setBookingFilter('all', this)">All</button>
+    <button type="button" class="admin-filter-pill" onclick="setBookingFilter('verify', this)">
+      Needs Verification <?php if ($needsVerificationCount > 0): ?><span class="filter-count-badge"><?= $needsVerificationCount ?></span><?php endif; ?>
+    </button>
+    <button type="button" class="admin-filter-pill" onclick="setBookingFilter('today', this)">Arriving Today</button>
+    <button type="button" class="admin-filter-pill" onclick="setBookingFilter('inhouse', this)">In-House</button>
+    <button type="button" class="admin-filter-pill" onclick="setBookingFilter('completed', this)">Completed</button>
+    <button type="button" class="admin-filter-pill" onclick="setBookingFilter('cancelled', this)">Cancelled</button>
+  </div>
+
   <?php if (empty($bookings)): ?>
     <p style="font-size: 0.85rem; color: var(--gray); margin-bottom: 2rem;">No reservations yet.</p>
   <?php else: ?>
-    <!-- Table wrapper preventing clipping and overflow -->
     <div class="table-responsive">
       <table class="admin-table" id="bookingsTable">
         <thead>
@@ -124,12 +212,22 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
         <tbody>
           <?php foreach ($bookings as $b): ?>
             <?php 
-              $today = date('Y-m-d');
               $isPastStay = ($b['checkout_date'] < $today);
+              $isArrivingToday = ($b['checkin_date'] === $today && $b['status'] === 'confirmed');
+              $isInHouse = ($b['status'] === 'confirmed' && $today >= $b['checkin_date'] && $today <= $b['checkout_date']);
               $payStatus = $b['payment_status'] ?? 'Pending (Due at Check-in)';
               $isPaid = in_array($payStatus, ['Paid (Online)', 'Paid (Verified)', 'Paid (Front Desk)'], true);
+              $needsVerify = ($b['status'] === 'confirmed' && $payStatus === 'Paid (Under Verification)');
+
+              // Tag for JS filtering
+              $filterTags = ['all'];
+              if ($needsVerify) $filterTags[] = 'verify';
+              if ($isArrivingToday) $filterTags[] = 'today';
+              if ($isInHouse) $filterTags[] = 'inhouse';
+              if ($isPastStay && $b['status'] === 'confirmed') $filterTags[] = 'completed';
+              if ($b['status'] === 'cancelled') $filterTags[] = 'cancelled';
             ?>
-            <tr>
+            <tr data-filter="<?= implode(' ', $filterTags) ?>">
               <td class="cell-nowrap">
                 <a href="booking-success.php?id=<?= $b['id'] ?>" target="_blank" style="color: var(--emerald-green); text-decoration: underline;" title="View Voucher Receipt">
                   <strong>#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?></strong>
@@ -161,7 +259,9 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
                   </small>
                 <?php endif; ?>
                 <?php if (!empty($b['payment_proof'])): ?>
-                  <a href="<?= htmlspecialchars($b['payment_proof']) ?>" target="_blank" style="display: inline-block; font-size: 0.66rem; font-weight: 700; color: var(--gold-dark); text-decoration: underline; margin-top: 2px; white-space: nowrap;">
+                  <a href="javascript:void(0)" 
+                     onclick="openProofModal('<?= htmlspecialchars($b['payment_proof']) ?>', '#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?>', '<?= htmlspecialchars($b['payment_ref'] ?? 'N/A') ?>', <?= $b['id'] ?>, <?= $isPaid ? 'true' : 'false' ?>)" 
+                     style="display: inline-block; font-size: 0.66rem; font-weight: 700; color: var(--gold-dark); text-decoration: underline; margin-top: 2px; white-space: nowrap;">
                     🔍 Screenshot
                   </a>
                 <?php endif; ?>
@@ -206,30 +306,45 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
     </div>
   <?php endif; ?>
 
-  <!-- Room Rates Management -->
-  <h3 style="color: var(--emerald-green); margin-bottom: 0.8rem; margin-top: 2rem;">Room Rates &amp; Catalog Management</h3>
+  <!-- Room Rates & Availability Management -->
+  <h3 style="color: var(--emerald-green); margin-bottom: 0.8rem; margin-top: 2.5rem;">Room Rates &amp; Catalog Management</h3>
   <div class="table-responsive">
     <table class="admin-table">
       <thead>
         <tr>
           <th>Room Name</th>
           <th>Category</th>
+          <th>Status</th>
           <th>Current Rate / Night</th>
           <th>Update Rate</th>
+          <th style="text-align: right;">Availability Toggle</th>
         </tr>
       </thead>
       <tbody>
         <?php foreach ($rooms as $room): ?>
+          <?php $isAvail = ($room['is_available'] ?? 1) == 1; ?>
           <tr>
             <td><strong><?= htmlspecialchars($room['name']) ?></strong></td>
             <td><?= htmlspecialchars($room['category']) ?></td>
-            <td><strong>&#8369;<?= number_format($room['price_per_night'], 2) ?></strong></td>
+            <td class="cell-nowrap">
+              <span class="badge <?= $isAvail ? 'badge-confirmed' : 'badge-cancelled' ?>">
+                <?= $isAvail ? 'Available' : 'Maintenance' ?>
+              </span>
+            </td>
+            <td class="cell-nowrap"><strong>&#8369;<?= number_format($room['price_per_night'], 2) ?></strong></td>
             <td>
               <form method="POST" action="function.php" style="display: flex; gap: 0.5rem; align-items: center;">
                 <input type="hidden" name="room_id" value="<?= $room['id'] ?>">
                 <input type="number" step="50" min="500" name="price_per_night" value="<?= (int)$room['price_per_night'] ?>" class="rate-inline-input" required>
                 <button type="submit" name="update-room-rate" class="btn btn-green btn-sm" style="padding: 0.35rem 0.7rem;">Save</button>
               </form>
+            </td>
+            <td class="cell-nowrap" style="text-align: right;">
+              <a href="function.php?action=toggle-room-status&id=<?= $room['id'] ?>" 
+                 class="btn <?= $isAvail ? 'btn-sage' : 'btn-gold' ?> btn-sm"
+                 style="font-size: 0.68rem; padding: 0.35rem 0.65rem;">
+                <?= $isAvail ? 'Set to Maintenance' : 'Set Available' ?>
+              </a>
             </td>
           </tr>
         <?php endforeach; ?>
@@ -309,19 +424,87 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
 
 </div>
 
-<script>
-  function filterBookingsTable() {
-    const input = document.getElementById('bookingSearch');
-    const filter = input.value.toLowerCase();
-    const table = document.getElementById('bookingsTable');
-    if (!table) return;
+<!-- In-App Payment Proof Lightbox Modal -->
+<div id="proofModal" class="modal-backdrop">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div>
+        <h4 id="modalBookingRef" style="color: var(--emerald-green); font-size: 1.05rem;">Payment Proof Verification</h4>
+        <small id="modalPayRef" style="color: var(--gray); font-family: monospace; font-size: 0.78rem;"></small>
+      </div>
+      <button type="button" class="modal-close-btn" onclick="closeProofModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <img id="modalProofImg" src="" alt="Payment Receipt Proof">
+    </div>
+    <div class="modal-footer" id="modalFooterActions">
+      <a href="" id="modalMarkPaidBtn" class="btn btn-green btn-sm" onclick="return confirm('Confirm verified payment for this reservation?');">
+        Confirm &amp; Mark Paid
+      </a>
+      <a href="" id="modalOpenTabBtn" target="_blank" class="btn btn-sage btn-sm">Open Full Image</a>
+    </div>
+  </div>
+</div>
 
-    const tr = table.getElementsByTagName('tr');
-    for (let i = 1; i < tr.length; i++) {
-      const rowText = tr[i].textContent || tr[i].innerText;
-      tr[i].style.display = rowText.toLowerCase().indexOf(filter) > -1 ? '' : 'none';
-    }
+<script>
+  let currentActiveFilter = 'all';
+
+  function setBookingFilter(filterKey, element) {
+    currentActiveFilter = filterKey;
+    document.querySelectorAll('.admin-filter-pill').forEach(btn => btn.classList.remove('active'));
+    if (element) element.classList.add('active');
+    applyFilters();
   }
+
+  function filterBookingsTable() {
+    applyFilters();
+  }
+
+  function applyFilters() {
+    const searchVal = document.getElementById('bookingSearch').value.toLowerCase();
+    const rows = document.querySelectorAll('#bookingsTable tbody tr');
+
+    rows.forEach(row => {
+      const rowText = (row.textContent || row.innerText).toLowerCase();
+      const rowTags = (row.getAttribute('data-filter') || '').split(' ');
+
+      const matchesFilter = (currentActiveFilter === 'all') || rowTags.includes(currentActiveFilter);
+      const matchesSearch = rowText.indexOf(searchVal) > -1;
+
+      row.style.display = (matchesFilter && matchesSearch) ? '' : 'none';
+    });
+  }
+
+  // Lightbox Modal Handlers
+  function openProofModal(imgSrc, bookingRef, payRef, bookingId, isPaid) {
+    document.getElementById('modalProofImg').src = imgSrc;
+    document.getElementById('modalBookingRef').textContent = 'Audit Proof: ' + bookingRef;
+    document.getElementById('modalPayRef').textContent = 'Transaction Ref: ' + payRef;
+    document.getElementById('modalOpenTabBtn').href = imgSrc;
+
+    const markPaidBtn = document.getElementById('modalMarkPaidBtn');
+    if (isPaid) {
+      markPaidBtn.style.display = 'none';
+    } else {
+      markPaidBtn.style.display = 'inline-flex';
+      markPaidBtn.href = 'function.php?action=confirm-payment&id=' + bookingId;
+    }
+
+    document.getElementById('proofModal').classList.add('active');
+  }
+
+  function closeProofModal() {
+    document.getElementById('proofModal').classList.remove('active');
+    document.getElementById('modalProofImg').src = '';
+  }
+
+  // Close modal on escape or background click
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeProofModal();
+  });
+  document.getElementById('proofModal').addEventListener('click', (e) => {
+    if (e.target.id === 'proofModal') closeProofModal();
+  });
 
   function dismissAlert() {
     const alert = document.getElementById('alert-banner');
