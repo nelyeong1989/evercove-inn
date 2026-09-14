@@ -58,7 +58,7 @@ $todayCheckouts = $pdo->query("
 ");
 $departures = $todayCheckouts->fetchAll();
 
-// Box 3: Active in-house stays (STRICT: Must be PAID and stay beyond today)
+// Box 3: Active in-house stays (STRICT: Must be PAID and staying past today)
 $inHouseStmt = $pdo->query("
     SELECT b.*, r.name AS room_name 
     FROM bookings b 
@@ -144,7 +144,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
 
   <!-- Operations Today Panel: 3 Columns -->
   <div class="ops-panel">
-    <!-- Box 1: Arrivals Today -->
+    <!-- Box 1: Arrivals Today (Clean without badge box) -->
     <div class="ops-col">
       <div class="ops-title">
         <span class="ops-dot arrival-dot"></span>
@@ -155,25 +155,11 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
       <?php else: ?>
         <div class="ops-list">
           <?php foreach ($arrivals as $arr): ?>
-            <?php 
-              $arrPayStatus = $arr['payment_status'] ?? 'Pending (Due at Check-in)';
-              $arrIsPaid = in_array($arrPayStatus, ['Paid (Online)', 'Paid (Verified)', 'Paid (Front Desk)'], true);
-            ?>
-            <div class="ops-item" id="arr-item-<?= $arr['id'] ?>">
+            <div class="ops-item">
               <div>
                 <strong><?= htmlspecialchars($arr['guest_name']) ?></strong>
                 <small><?= htmlspecialchars($arr['room_name']) ?> &bull; #EVR-<?= str_pad($arr['id'], 5, '0', STR_PAD_LEFT) ?></small>
               </div>
-              <?php if ($arrIsPaid): ?>
-                <span class="badge badge-confirmed">Checked In (Paid)</span>
-              <?php else: ?>
-                <a href="function.php?action=confirm-payment&id=<?= $arr['id'] ?>" 
-                   class="btn btn-green btn-sm btn-mark-paid" 
-                   style="font-size: 0.64rem; padding: 0.28rem 0.55rem;"
-                   onclick="return confirm('Collect payment & check in <?= htmlspecialchars(addslashes($arr['guest_name'])) ?>?');">
-                  Mark Paid
-                </a>
-              <?php endif; ?>
             </div>
           <?php endforeach; ?>
         </div>
@@ -191,31 +177,17 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
       <?php else: ?>
         <div class="ops-list">
           <?php foreach ($departures as $dep): ?>
-            <?php 
-              $depPayStatus = $dep['payment_status'] ?? 'Pending (Due at Check-in)';
-              $depIsPaid = in_array($depPayStatus, ['Paid (Online)', 'Paid (Verified)', 'Paid (Front Desk)'], true);
-            ?>
             <div class="ops-item" id="dep-item-<?= $dep['id'] ?>">
               <div>
                 <strong><?= htmlspecialchars($dep['guest_name']) ?></strong>
                 <small><?= htmlspecialchars($dep['room_name']) ?> &bull; #EVR-<?= str_pad($dep['id'], 5, '0', STR_PAD_LEFT) ?></small>
               </div>
-              <?php if ($depIsPaid): ?>
-                <a href="function.php?action=checkout-booking&id=<?= $dep['id'] ?>" 
-                   class="btn btn-gold btn-sm" 
-                   style="font-size: 0.66rem; padding: 0.3rem 0.6rem;"
-                   onclick="return confirm('Complete check-out for <?= htmlspecialchars(addslashes($dep['guest_name'])) ?>?');">
-                  Check Out
-                </a>
-              <?php else: ?>
-                <a href="function.php?action=confirm-payment&id=<?= $dep['id'] ?>" 
-                   class="btn btn-green btn-sm btn-mark-paid" 
-                   style="font-size: 0.64rem; padding: 0.28rem 0.55rem;"
-                   title="Settle payment before checking out"
-                   onclick="return confirm('Collect unsettled payment for <?= htmlspecialchars(addslashes($dep['guest_name'])) ?>?');">
-                  Collect &amp; Pay
-                </a>
-              <?php endif; ?>
+              <a href="function.php?action=checkout-booking&id=<?= $dep['id'] ?>" 
+                 class="btn btn-gold btn-sm" 
+                 style="font-size: 0.66rem; padding: 0.3rem 0.6rem;"
+                 onclick="return confirm('Complete check-out for <?= htmlspecialchars(addslashes($dep['guest_name'])) ?>?');">
+                Check Out
+              </a>
             </div>
           <?php endforeach; ?>
         </div>
@@ -298,7 +270,6 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
               $isPaid = in_array($payStatus, ['Paid (Online)', 'Paid (Verified)', 'Paid (Front Desk)'], true);
               $isPastStay = ($b['checkout_date'] < $today || $b['status'] === 'completed');
               $isArrivingToday = ($b['checkin_date'] === $today && $b['status'] === 'confirmed');
-              // STRICT: In-House stays require payment settlement
               $isInHouse = ($b['status'] === 'confirmed' && $isPaid && $today >= $b['checkin_date'] && $today <= $b['checkout_date']);
               $needsVerify = ($b['status'] === 'confirmed' && $payStatus === 'Paid (Under Verification)');
 
@@ -637,13 +608,6 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
           const bookingId = bookingIdMatch ? bookingIdMatch[1] : null;
           const targetRow = row || (bookingId ? document.querySelector(`tr[data-booking-id="${bookingId}"]`) : null);
 
-          // Update Arrivals box if trigger came from or exists there
-          const arrItem = document.getElementById(`arr-item-${bookingId}`);
-          if (arrItem) {
-            const arrBtn = arrItem.querySelector('.btn-mark-paid');
-            if (arrBtn) arrBtn.outerHTML = '<span class="badge badge-confirmed">Checked In (Paid)</span>';
-          }
-
           if (targetRow) {
             const payBadge = targetRow.querySelector('td:nth-child(6) .badge');
             if (payBadge) {
@@ -655,7 +619,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
             const cout = targetRow.getAttribute('data-checkout');
             const todayStr = '<?= $today ?>';
 
-            // If stay is currently active, tag row as inhouse
+            // Tag row as inhouse if stay is active
             let tags = (targetRow.getAttribute('data-filter') || '').split(' ');
             tags = tags.filter(t => t !== 'verify');
             if (todayStr >= cin && todayStr <= cout) {
@@ -699,7 +663,6 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
                 `;
                 ihList.appendChild(newIhItem);
 
-                // Update count in header
                 const ihHeader = document.getElementById('inhouse-header-count');
                 if (ihHeader) {
                   const currentCount = ihList.querySelectorAll('.ops-item').length;
@@ -716,7 +679,6 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
           if (opsItem) {
             opsItem.remove();
             
-            // Check if Box 3 is now empty
             const ihList = document.getElementById('inhouse-ops-list');
             if (ihList && ihList.querySelectorAll('.ops-item').length === 0) {
               ihList.innerHTML = '<p class="ops-empty" id="inhouse-empty-msg">No active paid guests staying past today.</p>';
