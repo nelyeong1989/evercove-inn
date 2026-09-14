@@ -18,8 +18,7 @@ $today = date('Y-m-d');
 $revStmt = $pdo->query("SELECT COALESCE(SUM(total_amount), 0) AS total_rev FROM bookings WHERE status IN ('confirmed', 'completed')");
 $totalRevenue = (float)$revStmt->fetchColumn();
 
-$activeStmt = $pdo->prepare("SELECT COUNT(*) FROM bookings WHERE status = 'confirmed' AND :today BETWEEN checkin_date AND checkout_date");
-$activeStmt->execute([':today' => $today]);
+$activeStmt = $pdo->query("SELECT COUNT(*) FROM bookings WHERE status = 'confirmed' AND CURRENT_DATE BETWEEN checkin_date AND checkout_date");
 $activeStays = (int)$activeStmt->fetchColumn();
 
 $confirmedCountStmt = $pdo->query("SELECT COUNT(*) FROM bookings WHERE status IN ('confirmed', 'completed')");
@@ -34,36 +33,33 @@ $totalRoomsCount = (int)$pdo->query("SELECT COUNT(*) FROM rooms")->fetchColumn()
 $occupancyRate = $totalRoomsCount > 0 ? round(($activeStays / $totalRoomsCount) * 100) : 0;
 
 // Box 1: Scheduled arrivals today
-$todayCheckins = $pdo->prepare("
+$todayCheckins = $pdo->query("
     SELECT b.*, r.name AS room_name 
     FROM bookings b 
     JOIN rooms r ON b.room_id = r.id 
-    WHERE b.checkin_date = :today AND b.status = 'confirmed'
+    WHERE b.checkin_date = CURRENT_DATE AND b.status = 'confirmed'
 ");
-$todayCheckins->execute([':today' => $today]);
 $arrivals = $todayCheckins->fetchAll();
 
 // Box 2: Scheduled departures today
-$todayCheckouts = $pdo->prepare("
+$todayCheckouts = $pdo->query("
     SELECT b.*, r.name AS room_name 
     FROM bookings b 
     JOIN rooms r ON b.room_id = r.id 
-    WHERE b.checkout_date = :today AND b.status = 'confirmed'
+    WHERE b.checkout_date = CURRENT_DATE AND b.status = 'confirmed'
 ");
-$todayCheckouts->execute([':today' => $today]);
 $departures = $todayCheckouts->fetchAll();
 
 // Box 3: Active in-house stays (staying beyond today)
-$inHouseStmt = $pdo->prepare("
+$inHouseStmt = $pdo->query("
     SELECT b.*, r.name AS room_name 
     FROM bookings b 
     JOIN rooms r ON b.room_id = r.id 
     WHERE b.status = 'confirmed' 
-      AND :today >= b.checkin_date 
-      AND :today < b.checkout_date
+      AND CURRENT_DATE >= b.checkin_date 
+      AND CURRENT_DATE < b.checkout_date
     ORDER BY b.checkout_date ASC
 ");
-$inHouseStmt->execute([':today' => $today]);
 $inHouseGuests = $inHouseStmt->fetchAll();
 
 // 3. Needs Verification Count
@@ -573,7 +569,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
     if (alert) alert.style.display = 'none';
   }
 
-  // Intercept Admin Clicks (Mark Paid, Operations Check Out, Cancel, Toggle Room, Delete Review) without reload
+  // Intercept Admin Clicks (Mark Paid, Check Out, Cancel, Toggle Room, Delete Review) without reload
   document.addEventListener('click', async function(e) {
     const link = e.target.closest('a[href*="function.php?action="]');
     if (!link) return;
@@ -621,7 +617,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
           }
         }
 
-        // 2. Expected Departures & Early Check Out UI update
+        // 2. Check Out & Early Check-Out UI update
         if (href.includes('action=checkout-booking') || href.includes('action=early-checkout')) {
           const opsItem = link.closest('.ops-item');
           if (opsItem) {
