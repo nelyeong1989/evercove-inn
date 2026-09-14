@@ -4,6 +4,7 @@ session_start();
 require 'database/config.php';
 require 'validation.php';
 
+// Helper to handle background AJAX requests and standard redirects
 function sendResponse(string $status, string $message, string $redirectUrl = 'admin.php'): void {
     $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') 
               || isset($_REQUEST['ajax']);
@@ -429,7 +430,7 @@ if (isset($_GET['action']) && in_array($_GET['action'], ['checkout-booking', 'ea
         try {
             $pdo = getConnection();
 
-            // Auto-upgrade status column if it's currently restricted to ENUM('confirmed', 'cancelled')
+            // Auto-upgrade status column if restricted to ENUM
             try {
                 $pdo->exec("ALTER TABLE bookings MODIFY COLUMN status VARCHAR(20) DEFAULT 'confirmed'");
             } catch (Exception $colEx) {}
@@ -446,6 +447,12 @@ if (isset($_GET['action']) && in_array($_GET['action'], ['checkout-booking', 'ea
             $b = $stmt->fetch();
 
             if ($b) {
+                // STRICT CHECK: Guest must have verified payment settled prior to checkout
+                $validPaidStatuses = ['Paid (Online)', 'Paid (Verified)', 'Paid (Front Desk)'];
+                if (!in_array($b['payment_status'], $validPaidStatuses, true)) {
+                    sendResponse('error', 'Guest balance is unsettled. Please mark reservation as paid before checking out.');
+                }
+
                 if ($b['checkin_date'] > $today) {
                     sendResponse('error', 'Guest has not checked in yet.');
                 }
