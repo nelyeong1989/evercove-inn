@@ -125,6 +125,78 @@ if (isset($_POST['reset-password'])) {
     }
 }
 
+// 3.9 Real-Time Room Availability Check (AJAX Endpoint)
+if (isset($_GET['action']) && $_GET['action'] === 'check-availability') {
+    header('Content-Type: application/json');
+    $roomId   = filter_input(INPUT_GET, 'room_id', FILTER_VALIDATE_INT);
+    $checkin  = trim($_GET['checkin'] ?? '');
+    $checkout = trim($_GET['checkout'] ?? '');
+    $today    = date('Y-m-d');
+
+    if (!$roomId || empty($checkin) || empty($checkout)) {
+        echo json_encode(['available' => false, 'message' => 'Please select a room and valid dates.']);
+        exit;
+    }
+
+    if ($checkin < $today) {
+        echo json_encode(['available' => false, 'message' => 'Check-in date cannot be in the past.']);
+        exit;
+    }
+
+    if ($checkout <= $checkin) {
+        echo json_encode(['available' => false, 'message' => 'Check-out date must be at least 1 day after check-in.']);
+        exit;
+    }
+
+    try {
+        $pdo = getConnection();
+        $roomStmt = $pdo->prepare("SELECT name, price_per_night, is_available FROM rooms WHERE id = :id");
+        $roomStmt->execute([':id' => $roomId]);
+        $room = $roomStmt->fetch();
+
+        if (!$room || ($room['is_available'] ?? 1) != 1) {
+            echo json_encode(['available' => false, 'message' => 'This room is currently undergoing maintenance and is unavailable.']);
+            exit;
+        }
+
+        // Check if dates conflict with any confirmed booking
+        $conflictStmt = $pdo->prepare("
+            SELECT COUNT(*) FROM bookings 
+            WHERE room_id = :room_id 
+              AND LOWER(TRIM(status)) = 'confirmed' 
+              AND checkin_date < :checkout 
+              AND checkout_date > :checkin
+        ");
+        $conflictStmt->execute([
+            ':room_id'  => $roomId,
+            ':checkout' => $checkout,
+            ':checkin'  => $checkin
+        ]);
+
+        if ($conflictStmt->fetchColumn() > 0) {
+            echo json_encode([
+                'available' => false,
+                'message'   => "⚠️ {$room['name']} is already booked for these dates. Please choose different dates or another room."
+            ]);
+            exit;
+        }
+
+        $nights = (strtotime($checkout) - strtotime($checkin)) / 86400;
+        $total  = $nights * (float)$room['price_per_night'];
+
+        echo json_encode([
+            'available' => true,
+            'message'   => "✓ {$room['name']} is available for {$nights} night(s) — Total: ₱" . number_format($total, 2),
+            'nights'    => $nights,
+            'total'     => number_format($total, 2)
+        ]);
+        exit;
+    } catch (Exception $e) {
+        echo json_encode(['available' => false, 'message' => 'Unable to verify availability right now.']);
+        exit;
+    }
+}
+
 // 4. Make a Reservation with Payment Verification & Proof Screenshot
 if (isset($_POST['book-stay'])) {
     if (!isset($_SESSION['user_id'])) {

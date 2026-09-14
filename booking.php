@@ -91,11 +91,11 @@ try {
       <p style="color: var(--gray); font-size: 0.95rem; margin-top: 0.4rem;">Select your preferred dates, room, and payment method below.</p>
     </div>
 
-    <form method="POST" action="function.php" enctype="multipart/form-data">
+    <form method="POST" action="function.php" enctype="multipart/form-data" id="bookingForm">
       <div class="booking-form-grid">
         <div class="booking-input-group full-width">
           <label for="room_id">Select Room / Suite</label>
-          <select id="room_id" name="room_id" onchange="updateGuestLimit()" required>
+          <select id="room_id" name="room_id" onchange="onRoomOrDateChange()" required>
             <?php foreach ($rooms as $r): ?>
               <?php $roomMax = getRoomMaxGuests($r['category']); ?>
               <option value="<?= $r['id'] ?>" 
@@ -109,13 +109,16 @@ try {
 
         <div class="booking-input-group">
           <label for="checkin">Check In Date</label>
-          <input type="date" id="checkin" name="checkin" value="<?= htmlspecialchars($checkinParam ?: date('Y-m-d')) ?>" min="<?= date('Y-m-d') ?>" required>
+          <input type="date" id="checkin" name="checkin" value="<?= htmlspecialchars($checkinParam ?: date('Y-m-d')) ?>" min="<?= date('Y-m-d') ?>" onchange="onRoomOrDateChange()" required>
         </div>
 
         <div class="booking-input-group">
           <label for="checkout">Check Out Date</label>
-          <input type="date" id="checkout" name="checkout" value="<?= htmlspecialchars($checkoutParam ?: date('Y-m-d', strtotime('+2 days'))) ?>" min="<?= date('Y-m-d', strtotime('+1 day')) ?>" required>
+          <input type="date" id="checkout" name="checkout" value="<?= htmlspecialchars($checkoutParam ?: date('Y-m-d', strtotime('+2 days'))) ?>" min="<?= date('Y-m-d', strtotime('+1 day')) ?>" onchange="onRoomOrDateChange()" required>
         </div>
+
+        <!-- Real-Time Availability Alert Banner -->
+        <div id="availability-status-box" class="full-width" style="display: none; padding: 0.85rem 1.1rem; border-radius: 8px; font-size: 0.82rem; font-weight: 700; transition: all 0.2s ease;"></div>
 
         <div class="booking-input-group full-width">
           <label for="guests" id="guest-label">Number of Guests</label>
@@ -265,7 +268,7 @@ try {
       <input type="hidden" name="guest_name" value="<?= htmlspecialchars($_SESSION['username']) ?>">
       <input type="hidden" name="guest_email" value="<?= htmlspecialchars($_SESSION['email']) ?>">
 
-      <button type="submit" name="book-stay" class="btn btn-gold" style="width: 100%; margin-top: 1.8rem; padding: 1.1rem; font-size: 0.92rem;">
+      <button type="submit" id="submitBookingBtn" name="book-stay" class="btn btn-gold" style="width: 100%; margin-top: 1.8rem; padding: 1.1rem; font-size: 0.92rem; transition: all 0.2s ease;">
         Confirm &amp; Reserve Stay
       </button>
     </form>
@@ -282,6 +285,69 @@ try {
 </footer>
 
 <script>
+  let availabilityTimeout = null;
+
+  function onRoomOrDateChange() {
+    updateGuestLimit();
+    clearTimeout(availabilityTimeout);
+    availabilityTimeout = setTimeout(checkRealtimeAvailability, 200);
+  }
+
+  async function checkRealtimeAvailability() {
+    const roomId = document.getElementById('room_id')?.value;
+    const checkin = document.getElementById('checkin')?.value;
+    const checkout = document.getElementById('checkout')?.value;
+    const statusBox = document.getElementById('availability-status-box');
+    const submitBtn = document.getElementById('submitBookingBtn');
+
+    if (!roomId || !checkin || !checkout || !statusBox || !submitBtn) return;
+
+    // Minimum checkout validation
+    if (checkout <= checkin) {
+      statusBox.style.display = 'block';
+      statusBox.style.background = '#fbeae8';
+      statusBox.style.color = '#a83232';
+      statusBox.style.border = '1.5px solid #a83232';
+      statusBox.textContent = 'Check-out date must be after check-in date.';
+      submitBtn.disabled = true;
+      submitBtn.style.opacity = '0.5';
+      submitBtn.style.cursor = 'not-allowed';
+      submitBtn.textContent = 'Invalid Dates Selected';
+      return;
+    }
+
+    try {
+      const response = await fetch(`function.php?action=check-availability&room_id=${roomId}&checkin=${checkin}&checkout=${checkout}`);
+      const data = await response.json();
+
+      statusBox.style.display = 'block';
+
+      if (data.available) {
+        statusBox.style.background = 'rgba(39, 77, 58, 0.1)';
+        statusBox.style.color = 'var(--emerald-green)';
+        statusBox.style.border = '1.5px solid var(--emerald-green)';
+        statusBox.textContent = data.message;
+
+        submitBtn.disabled = false;
+        submitBtn.style.opacity = '1';
+        submitBtn.style.cursor = 'pointer';
+        submitBtn.textContent = 'Confirm & Reserve Stay';
+      } else {
+        statusBox.style.background = '#fbeae8';
+        statusBox.style.color = '#a83232';
+        statusBox.style.border = '1.5px solid #a83232';
+        statusBox.textContent = data.message;
+
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.5';
+        submitBtn.style.cursor = 'not-allowed';
+        submitBtn.textContent = 'Room Unavailable for Dates';
+      }
+    } catch (err) {
+      console.error('Availability check error:', err);
+    }
+  }
+
   function selectPayment(cardElement, mode) {
     document.querySelectorAll('.payment-card').forEach(c => c.classList.remove('active'));
     cardElement.classList.add('active');
@@ -356,6 +422,7 @@ try {
 
   window.addEventListener('DOMContentLoaded', () => {
     updateGuestLimit();
+    checkRealtimeAvailability();
 
     const alert = document.getElementById('alert-banner');
     if (alert) {
