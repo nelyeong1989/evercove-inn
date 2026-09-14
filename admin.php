@@ -184,7 +184,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
   <div class="admin-filter-bar">
     <button type="button" class="admin-filter-pill active" onclick="setBookingFilter('all', this)">All</button>
     <button type="button" class="admin-filter-pill" onclick="setBookingFilter('verify', this)">
-      Needs Verification <?php if ($needsVerificationCount > 0): ?><span class="filter-count-badge"><?= $needsVerificationCount ?></span><?php endif; ?>
+      Needs Verification <?php if ($needsVerificationCount > 0): ?><span class="filter-count-badge" id="verifyBadgeCount"><?= $needsVerificationCount ?></span><?php endif; ?>
     </button>
     <button type="button" class="admin-filter-pill" onclick="setBookingFilter('today', this)">Arriving Today</button>
     <button type="button" class="admin-filter-pill" onclick="setBookingFilter('inhouse', this)">In-House</button>
@@ -226,7 +226,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
               if ($isPastStay && $b['status'] === 'confirmed') $filterTags[] = 'completed';
               if ($b['status'] === 'cancelled') $filterTags[] = 'cancelled';
             ?>
-            <tr data-filter="<?= implode(' ', $filterTags) ?>">
+            <tr data-filter="<?= implode(' ', $filterTags) ?>" data-booking-id="<?= $b['id'] ?>">
               <td class="cell-nowrap">
                 <a href="booking-success.php?id=<?= $b['id'] ?>" style="color: var(--emerald-green); text-decoration: underline;" title="View Voucher Receipt">
                   <strong>#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?></strong>
@@ -279,7 +279,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
 
                 <?php if ($b['status'] === 'confirmed' && !$isPaid): ?>
                   <a href="function.php?action=confirm-payment&id=<?= $b['id'] ?>" 
-                     class="btn btn-green btn-sm" 
+                     class="btn btn-green btn-sm btn-mark-paid" 
                      style="padding: 0.32rem 0.5rem; font-size: 0.66rem; margin-right: 3px;"
                      onclick="return confirm('Confirm verified payment for this reservation?');">
                     Mark Paid
@@ -503,10 +503,153 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
     if (e.target.id === 'proofModal') closeProofModal();
   });
 
+  function showBanner(message, type = 'success') {
+    let alert = document.getElementById('alert-banner');
+    if (!alert) {
+      alert = document.createElement('div');
+      alert.id = 'alert-banner';
+      alert.innerHTML = `<span></span><button type="button" class="alert-close" onclick="dismissAlert()">&times;</button>`;
+      document.querySelector('.admin-wrap').prepend(alert);
+    }
+    alert.className = `system-alert ${type === 'success' ? 'alert-success' : 'alert-error'}`;
+    alert.querySelector('span').textContent = message;
+    alert.style.display = 'flex';
+    setTimeout(dismissAlert, 3500);
+  }
+
   function dismissAlert() {
     const alert = document.getElementById('alert-banner');
     if (alert) alert.style.display = 'none';
   }
+
+  document.addEventListener('click', async function(e) {
+    const link = e.target.closest('a[href*="function.php?action="]');
+    if (!link) return;
+
+    const href = link.getAttribute('href');
+    if (href.includes('action=logout')) return;
+
+    e.preventDefault();
+
+    if (link.hasAttribute('onclick')) {
+      const confirmMatch = link.getAttribute('onclick').match(/confirm\('([^']+)'\)/);
+      if (confirmMatch && !confirm(confirmMatch[1])) return;
+    }
+
+    try {
+      const response = await fetch(href + '&ajax=1', {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      const result = await response.json();
+
+      if (result.status === 'success') {
+        showBanner(result.message, 'success');
+        const row = link.closest('tr');
+
+        // Confirm Payment UI update
+        if (href.includes('action=confirm-payment')) {
+          link.remove();
+          closeProofModal();
+
+          const bookingIdMatch = href.match(/id=(\d+)/);
+          const targetRow = row || (bookingIdMatch ? document.querySelector(`tr[data-booking-id="${bookingIdMatch[1]}"]`) : null);
+
+          if (targetRow) {
+            const payBadge = targetRow.querySelector('td:nth-child(6) .badge');
+            if (payBadge) {
+              payBadge.textContent = 'Paid (Verified)';
+              payBadge.style.background = 'var(--forest-green)';
+            }
+            const oldFilter = targetRow.getAttribute('data-filter') || '';
+            targetRow.setAttribute('data-filter', oldFilter.replace('verify', '').trim());
+
+            // Decrement badge count
+            const countBadge = document.getElementById('verifyBadgeCount');
+            if (countBadge) {
+              const currentVal = parseInt(countBadge.textContent, 10) - 1;
+              if (currentVal <= 0) countBadge.remove();
+              else countBadge.textContent = currentVal;
+            }
+          }
+        }
+
+        // Cancel Reservation UI update
+        if (href.includes('action=cancel-booking')) {
+          link.remove();
+          if (row) {
+            const statusCell = row.querySelector('td:nth-child(7)');
+            if (statusCell) statusCell.innerHTML = '<span class="badge badge-cancelled">cancelled</span>';
+            row.setAttribute('data-filter', 'all cancelled');
+          }
+        }
+
+        // Toggle Room Availability UI update
+        if (href.includes('action=toggle-room-status')) {
+          if (row) {
+            const statusBadge = row.querySelector('td:nth-child(3) .badge');
+            const isCurrentlyAvail = statusBadge && statusBadge.textContent.trim().toLowerCase() === 'available';
+
+            if (isCurrentlyAvail) {
+              statusBadge.className = 'badge badge-cancelled';
+              statusBadge.textContent = 'Maintenance';
+              link.className = 'btn btn-gold btn-sm';
+              link.textContent = 'Set Available';
+            } else {
+              statusBadge.className = 'badge badge-confirmed';
+              statusBadge.textContent = 'Available';
+              link.className = 'btn btn-sage btn-sm';
+              link.textContent = 'Set to Maintenance';
+            }
+          }
+        }
+
+        // Delete Review UI update
+        if (href.includes('action=delete-review')) {
+          if (row) row.remove();
+        }
+      } else {
+        showBanner(result.message, 'error');
+      }
+    } catch (err) {
+      showBanner('Failed to process request. Please try again.', 'error');
+    }
+  });
+
+  // Intercept Inline Room Rate Form Submissions without page reload
+  document.addEventListener('submit', async function(e) {
+    const form = e.target.closest('form[action="function.php"]');
+    if (!form || !form.querySelector('button[name="update-room-rate"]')) return;
+
+    e.preventDefault();
+    const formData = new FormData(form);
+    formData.append('ajax', '1');
+    formData.append('update-room-rate', '1');
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      const result = await response.json();
+
+      if (result.status === 'success') {
+        showBanner(result.message, 'success');
+        const row = form.closest('tr');
+        const newRate = parseFloat(form.querySelector('input[name="price_per_night"]').value);
+        if (row && !isNaN(newRate)) {
+          const rateCell = row.querySelector('td:nth-child(4) strong');
+          if (rateCell) {
+            rateCell.innerHTML = '&#8369;' + newRate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          }
+        }
+      } else {
+        showBanner(result.message, 'error');
+      }
+    } catch (err) {
+      showBanner('Could not save room rate. Please try again.', 'error');
+    }
+  });
 
   window.addEventListener('DOMContentLoaded', () => {
     const alert = document.getElementById('alert-banner');

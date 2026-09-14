@@ -4,6 +4,18 @@ session_start();
 require 'database/config.php';
 require 'validation.php';
 
+function sendResponse(string $status, string $message, string $redirectUrl = 'admin.php'): void {
+    $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') 
+              || isset($_REQUEST['ajax']);
+    if ($isAjax) {
+        header('Content-Type: application/json');
+        echo json_encode(['status' => $status, 'message' => $message]);
+        exit;
+    }
+    header("Location: {$redirectUrl}?status={$status}&message=" . urlencode($message));
+    exit;
+}
+
 // 1. User Registration
 if (isset($_POST['register-user'])) {
     $result = validateRegisterInput($_POST);
@@ -60,7 +72,6 @@ if (isset($_POST['login-user'])) {
         $_SESSION['email']    = $user['email'];
         $_SESSION['role']     = $user['role'];
 
-        // Dynamic Role-Based Redirection
         if ($user['role'] === 'admin') {
             header('Location: admin.php');
         } else {
@@ -381,11 +392,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'user-cancel-booking') {
     exit;
 }
 
-// 7. Admin Cancels Booking
+// 7. Admin Cancels Booking (AJAX Aware)
 if (isset($_GET['action']) && $_GET['action'] === 'cancel-booking') {
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-        header('Location: login.php?status=error&message=' . urlencode('Unauthorized access.'));
-        exit;
+        sendResponse('error', 'Unauthorized access.', 'login.php');
     }
 
     $bookingId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
@@ -396,26 +406,22 @@ if (isset($_GET['action']) && $_GET['action'] === 'cancel-booking') {
             $stmt->execute([':id' => $bookingId]);
 
             if ($stmt->rowCount() > 0) {
-                header('Location: admin.php?status=success&message=' . urlencode('Booking #EVR-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT) . ' marked as cancelled. Room dates reopened.'));
+                sendResponse('success', 'Booking #EVR-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT) . ' marked as cancelled. Dates reopened.');
             } else {
-                header('Location: admin.php?status=error&message=' . urlencode('Past completed stays cannot be cancelled.'));
+                sendResponse('error', 'Past completed stays cannot be cancelled.');
             }
-            exit;
         } catch (PDOException $e) {
-            header('Location: admin.php?status=error&message=' . urlencode($e->getMessage()));
-            exit;
+            sendResponse('error', $e->getMessage());
         }
     }
 
-    header('Location: admin.php');
-    exit;
+    sendResponse('error', 'Invalid booking identifier.');
 }
 
-// 8. Admin Confirms Payment Settlement
+// 8. Admin Confirms Payment Settlement (AJAX Aware)
 if (isset($_GET['action']) && $_GET['action'] === 'confirm-payment') {
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-        header('Location: login.php?status=error&message=' . urlencode('Unauthorized access.'));
-        exit;
+        sendResponse('error', 'Unauthorized access.', 'login.php');
     }
 
     $bookingId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
@@ -425,23 +431,19 @@ if (isset($_GET['action']) && $_GET['action'] === 'confirm-payment') {
             $stmt = $pdo->prepare("UPDATE bookings SET payment_status = 'Paid (Verified)' WHERE id = :id AND status = 'confirmed'");
             $stmt->execute([':id' => $bookingId]);
 
-            header('Location: admin.php?status=success&message=' . urlencode('Payment confirmed for booking #EVR-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT) . '.'));
-            exit;
+            sendResponse('success', 'Payment verified for booking #EVR-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT) . '.');
         } catch (PDOException $e) {
-            header('Location: admin.php?status=error&message=' . urlencode($e->getMessage()));
-            exit;
+            sendResponse('error', $e->getMessage());
         }
     }
 
-    header('Location: admin.php');
-    exit;
+    sendResponse('error', 'Invalid booking identifier.');
 }
 
-// 9. Admin Updates Room Price
+// 9. Admin Updates Room Price (AJAX Aware)
 if (isset($_POST['update-room-rate'])) {
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-        header('Location: login.php');
-        exit;
+        sendResponse('error', 'Unauthorized access.', 'login.php');
     }
 
     $roomId = filter_input(INPUT_POST, 'room_id', FILTER_VALIDATE_INT);
@@ -453,23 +455,19 @@ if (isset($_POST['update-room-rate'])) {
             $stmt = $pdo->prepare("UPDATE rooms SET price_per_night = :rate WHERE id = :id");
             $stmt->execute([':rate' => $newRate, ':id' => $roomId]);
 
-            header('Location: admin.php?status=success&message=' . urlencode('Room rate updated successfully.'));
-            exit;
+            sendResponse('success', 'Room rate updated successfully.');
         } catch (PDOException $e) {
-            header('Location: admin.php?status=error&message=' . urlencode($e->getMessage()));
-            exit;
+            sendResponse('error', $e->getMessage());
         }
     }
 
-    header('Location: admin.php?status=error&message=' . urlencode('Invalid rate value submitted.'));
-    exit;
+    sendResponse('error', 'Invalid rate value submitted.');
 }
 
-// 9.1 Admin Toggles Room Availability (Active vs Maintenance)
+// 9.1 Admin Toggles Room Availability (Active vs Maintenance - AJAX Aware)
 if (isset($_GET['action']) && $_GET['action'] === 'toggle-room-status') {
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-        header('Location: login.php');
-        exit;
+        sendResponse('error', 'Unauthorized access.', 'login.php');
     }
 
     $roomId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
@@ -479,23 +477,19 @@ if (isset($_GET['action']) && $_GET['action'] === 'toggle-room-status') {
             $stmt = $pdo->prepare("UPDATE rooms SET is_available = CASE WHEN is_available = 1 THEN 0 ELSE 1 END WHERE id = :id");
             $stmt->execute([':id' => $roomId]);
 
-            header('Location: admin.php?status=success&message=' . urlencode('Room availability toggled successfully.'));
-            exit;
+            sendResponse('success', 'Room availability status updated.');
         } catch (PDOException $e) {
-            header('Location: admin.php?status=error&message=' . urlencode($e->getMessage()));
-            exit;
+            sendResponse('error', $e->getMessage());
         }
     }
 
-    header('Location: admin.php');
-    exit;
+    sendResponse('error', 'Invalid room identifier.');
 }
 
-// 10. Admin Moderation: Remove Review
+// 10. Admin Moderation: Remove Review (AJAX Aware)
 if (isset($_GET['action']) && $_GET['action'] === 'delete-review') {
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-        header('Location: login.php');
-        exit;
+        sendResponse('error', 'Unauthorized access.', 'login.php');
     }
 
     $reviewId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
@@ -505,16 +499,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete-review') {
             $stmt = $pdo->prepare("DELETE FROM reviews WHERE id = :id");
             $stmt->execute([':id' => $reviewId]);
 
-            header('Location: admin.php?status=success&message=' . urlencode('Review removed from public site.'));
-            exit;
+            sendResponse('success', 'Review permanently removed from site.');
         } catch (PDOException $e) {
-            header('Location: admin.php?status=error&message=' . urlencode($e->getMessage()));
-            exit;
+            sendResponse('error', $e->getMessage());
         }
     }
 
-    header('Location: admin.php');
-    exit;
+    sendResponse('error', 'Invalid review identifier.');
 }
 
 // 11. Post Anonymous Review
