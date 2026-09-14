@@ -33,6 +33,7 @@ $avgRating = ($ratingData && $ratingData['count'] > 0) ? number_format((float)$r
 $totalRoomsCount = (int)$pdo->query("SELECT COUNT(*) FROM rooms")->fetchColumn();
 $occupancyRate = $totalRoomsCount > 0 ? round(($activeStays / $totalRoomsCount) * 100) : 0;
 
+// Box 1: Scheduled arrivals today
 $todayCheckins = $pdo->prepare("
     SELECT b.*, r.name AS room_name 
     FROM bookings b 
@@ -42,6 +43,7 @@ $todayCheckins = $pdo->prepare("
 $todayCheckins->execute([':today' => $today]);
 $arrivals = $todayCheckins->fetchAll();
 
+// Box 2: Scheduled departures today
 $todayCheckouts = $pdo->prepare("
     SELECT b.*, r.name AS room_name 
     FROM bookings b 
@@ -50,6 +52,19 @@ $todayCheckouts = $pdo->prepare("
 ");
 $todayCheckouts->execute([':today' => $today]);
 $departures = $todayCheckouts->fetchAll();
+
+// Box 3: Active in-house stays (staying beyond today)
+$inHouseStmt = $pdo->prepare("
+    SELECT b.*, r.name AS room_name 
+    FROM bookings b 
+    JOIN rooms r ON b.room_id = r.id 
+    WHERE b.status = 'confirmed' 
+      AND :today >= b.checkin_date 
+      AND :today < b.checkout_date
+    ORDER BY b.checkout_date ASC
+");
+$inHouseStmt->execute([':today' => $today]);
+$inHouseGuests = $inHouseStmt->fetchAll();
 
 // 3. Needs Verification Count
 $needsVerificationCount = (int)$pdo->query("SELECT COUNT(*) FROM bookings WHERE status = 'confirmed' AND payment_status = 'Paid (Under Verification)'")->fetchColumn();
@@ -122,15 +137,16 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
     </div>
   </div>
 
-  <!-- Operations Today Panel -->
+  <!-- Operations Today Panel: 3 Columns -->
   <div class="ops-panel">
+    <!-- Box 1: Arrivals -->
     <div class="ops-col">
       <div class="ops-title">
         <span class="ops-dot arrival-dot"></span>
-        <h4>Today's Expected Arrivals (<?= count($arrivals) ?>)</h4>
+        <h4>Today's Arrivals (<?= count($arrivals) ?>)</h4>
       </div>
       <?php if (empty($arrivals)): ?>
-        <p class="ops-empty">No scheduled check-ins for today.</p>
+        <p class="ops-empty">No scheduled check-ins today.</p>
       <?php else: ?>
         <div class="ops-list">
           <?php foreach ($arrivals as $arr): ?>
@@ -146,13 +162,14 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
       <?php endif; ?>
     </div>
 
+    <!-- Box 2: Departures Today -->
     <div class="ops-col">
       <div class="ops-title">
         <span class="ops-dot departure-dot"></span>
-        <h4>Today's Expected Departures (<?= count($departures) ?>)</h4>
+        <h4>Departures Today (<?= count($departures) ?>)</h4>
       </div>
       <?php if (empty($departures)): ?>
-        <p class="ops-empty">No scheduled check-outs for today.</p>
+        <p class="ops-empty">No scheduled check-outs today.</p>
       <?php else: ?>
         <div class="ops-list">
           <?php foreach ($departures as $dep): ?>
@@ -161,11 +178,38 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
                 <strong><?= htmlspecialchars($dep['guest_name']) ?></strong>
                 <small><?= htmlspecialchars($dep['room_name']) ?> &bull; #EVR-<?= str_pad($dep['id'], 5, '0', STR_PAD_LEFT) ?></small>
               </div>
-              <!-- Clickable Check-Out Action Button -->
               <a href="function.php?action=checkout-booking&id=<?= $dep['id'] ?>" 
-                 class="btn btn-gold btn-sm btn-ops-checkout" 
-                 style="font-size: 0.68rem; padding: 0.3rem 0.65rem;"
+                 class="btn btn-gold btn-sm" 
+                 style="font-size: 0.66rem; padding: 0.3rem 0.6rem;"
                  onclick="return confirm('Complete check-out for <?= htmlspecialchars(addslashes($dep['guest_name'])) ?>?');">
+                Check Out
+              </a>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+
+    <!-- Box 3: Active In-House Guests (Early Check-Out) -->
+    <div class="ops-col">
+      <div class="ops-title">
+        <span class="ops-dot inhouse-dot"></span>
+        <h4>Active In-House (<?= count($inHouseGuests) ?>)</h4>
+      </div>
+      <?php if (empty($inHouseGuests)): ?>
+        <p class="ops-empty">No guests staying past today.</p>
+      <?php else: ?>
+        <div class="ops-list">
+          <?php foreach ($inHouseGuests as $ih): ?>
+            <div class="ops-item" id="ih-item-<?= $ih['id'] ?>">
+              <div>
+                <strong><?= htmlspecialchars($ih['guest_name']) ?></strong>
+                <small><?= htmlspecialchars($ih['room_name']) ?> &bull; Dep: <?= date('M j', strtotime($ih['checkout_date'])) ?></small>
+              </div>
+              <a href="function.php?action=early-checkout&id=<?= $ih['id'] ?>" 
+                 class="btn btn-sage btn-sm" 
+                 style="font-size: 0.66rem; padding: 0.3rem 0.6rem;"
+                 onclick="return confirm('Process early check-out for <?= htmlspecialchars(addslashes($ih['guest_name'])) ?>? Room will be released today.');">
                 Check Out
               </a>
             </div>
@@ -577,7 +621,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
           }
         }
 
-        // 2. Expected Departures Check Out UI update
+        // 2. Expected Departures & Early Check Out UI update
         if (href.includes('action=checkout-booking') || href.includes('action=early-checkout')) {
           const opsItem = link.closest('.ops-item');
           if (opsItem) {
