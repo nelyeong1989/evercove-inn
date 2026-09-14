@@ -4,13 +4,12 @@ session_start();
 require 'database/config.php';
 require 'validation.php';
 
-// Helper to handle background AJAX requests and standard redirects
-function sendResponse(string $status, string $message, string $redirectUrl = 'admin.php'): void {
+function sendResponse(string $status, string $message, string $redirectUrl = 'admin.php', array $extra = []): void {
     $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') 
               || isset($_REQUEST['ajax']);
     if ($isAjax) {
         header('Content-Type: application/json');
-        echo json_encode(['status' => $status, 'message' => $message]);
+        echo json_encode(array_merge(['status' => $status, 'message' => $message], $extra));
         exit;
     }
     header("Location: {$redirectUrl}?status={$status}&message=" . urlencode($message));
@@ -406,8 +405,22 @@ if (isset($_GET['action']) && $_GET['action'] === 'cancel-booking') {
             $stmt = $pdo->prepare("UPDATE bookings SET status = 'cancelled' WHERE id = :id AND checkout_date >= CURRENT_DATE");
             $stmt->execute([':id' => $bookingId]);
 
+            // Re-calculate verified gross revenue
+            $revStmt = $pdo->query("
+                SELECT COALESCE(SUM(total_amount), 0) 
+                FROM bookings 
+                WHERE status IN ('confirmed', 'completed')
+                  AND payment_status IN ('Paid (Online)', 'Paid (Verified)', 'Paid (Front Desk)')
+            ");
+            $newTotalRevenue = (float)$revStmt->fetchColumn();
+
             if ($stmt->rowCount() > 0) {
-                sendResponse('success', 'Booking #EVR-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT) . ' marked as cancelled. Room reopened.');
+                sendResponse(
+                    'success', 
+                    'Booking #EVR-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT) . ' marked as cancelled. Room reopened.',
+                    'admin.php',
+                    ['new_revenue' => number_format($newTotalRevenue, 2)]
+                );
             } else {
                 sendResponse('error', 'Past completed stays cannot be cancelled.');
             }
@@ -480,7 +493,21 @@ if (isset($_GET['action']) && in_array($_GET['action'], ['checkout-booking', 'ea
                     $upd->execute([':id' => $bookingId]);
                 }
 
-                sendResponse('success', 'Guest checked out successfully. Room is now available.');
+                // Re-calculate verified gross revenue
+                $revStmt = $pdo->query("
+                    SELECT COALESCE(SUM(total_amount), 0) 
+                    FROM bookings 
+                    WHERE status IN ('confirmed', 'completed')
+                      AND payment_status IN ('Paid (Online)', 'Paid (Verified)', 'Paid (Front Desk)')
+                ");
+                $newTotalRevenue = (float)$revStmt->fetchColumn();
+
+                sendResponse(
+                    'success', 
+                    'Guest checked out successfully. Room is now available.',
+                    'admin.php',
+                    ['new_revenue' => number_format($newTotalRevenue, 2)]
+                );
             } else {
                 sendResponse('error', 'Reservation not found or already completed/cancelled.');
             }
@@ -492,7 +519,7 @@ if (isset($_GET['action']) && in_array($_GET['action'], ['checkout-booking', 'ea
     sendResponse('error', 'Invalid booking identifier.');
 }
 
-// 8. Admin Confirms Payment Settlement (AJAX Aware)
+// 8. Admin Confirms Payment Settlement (AJAX Aware - Computes and returns updated gross revenue)
 if (isset($_GET['action']) && $_GET['action'] === 'confirm-payment') {
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
         sendResponse('error', 'Unauthorized access.', 'login.php');
@@ -505,7 +532,21 @@ if (isset($_GET['action']) && $_GET['action'] === 'confirm-payment') {
             $stmt = $pdo->prepare("UPDATE bookings SET payment_status = 'Paid (Verified)' WHERE id = :id AND status = 'confirmed'");
             $stmt->execute([':id' => $bookingId]);
 
-            sendResponse('success', 'Payment verified for booking #EVR-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT) . '.');
+            // Compute updated verified collected revenue
+            $revStmt = $pdo->query("
+                SELECT COALESCE(SUM(total_amount), 0) 
+                FROM bookings 
+                WHERE status IN ('confirmed', 'completed')
+                  AND payment_status IN ('Paid (Online)', 'Paid (Verified)', 'Paid (Front Desk)')
+            ");
+            $newTotalRevenue = (float)$revStmt->fetchColumn();
+
+            sendResponse(
+                'success', 
+                'Payment verified for booking #EVR-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT) . '.',
+                'admin.php',
+                ['new_revenue' => number_format($newTotalRevenue, 2)]
+            );
         } catch (PDOException $e) {
             sendResponse('error', $e->getMessage());
         }

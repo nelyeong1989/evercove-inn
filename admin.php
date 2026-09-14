@@ -14,8 +14,13 @@ $message = $_GET['message'] ?? null;
 $pdo = getConnection();
 $today = date('Y-m-d');
 
-// 1. Fetch dashboard overview stats
-$revStmt = $pdo->query("SELECT COALESCE(SUM(total_amount), 0) AS total_rev FROM bookings WHERE status IN ('confirmed', 'completed')");
+// 1. Fetch dashboard overview stats (Gross revenue ONLY counts verified paid reservations)
+$revStmt = $pdo->query("
+    SELECT COALESCE(SUM(total_amount), 0) AS total_rev 
+    FROM bookings 
+    WHERE status IN ('confirmed', 'completed')
+      AND payment_status IN ('Paid (Online)', 'Paid (Verified)', 'Paid (Front Desk)')
+");
 $totalRevenue = (float)$revStmt->fetchColumn();
 
 // Only count paid stays as active occupancy
@@ -119,8 +124,8 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
   <div class="kpi-grid">
     <div class="kpi-card">
       <span class="kpi-label">Gross Revenue</span>
-      <div class="kpi-number">&#8369;<?= number_format($totalRevenue, 2) ?></div>
-      <small>Confirmed &amp; completed stays</small>
+      <div class="kpi-number" id="kpiGrossRevenue">&#8369;<?= number_format($totalRevenue, 2) ?></div>
+      <small>Verified collected revenue</small>
     </div>
     <div class="kpi-card">
       <span class="kpi-label">Occupancy Rate</span>
@@ -144,7 +149,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
 
   <!-- Operations Today Panel: 3 Columns -->
   <div class="ops-panel">
-    <!-- Box 1: Arrivals Today (Clean without badge box) -->
+    <!-- Box 1: Arrivals Today -->
     <div class="ops-col">
       <div class="ops-title">
         <span class="ops-dot arrival-dot"></span>
@@ -270,6 +275,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
               $isPaid = in_array($payStatus, ['Paid (Online)', 'Paid (Verified)', 'Paid (Front Desk)'], true);
               $isPastStay = ($b['checkout_date'] < $today || $b['status'] === 'completed');
               $isArrivingToday = ($b['checkin_date'] === $today && $b['status'] === 'confirmed');
+              // STRICT: In-House stays require payment settlement
               $isInHouse = ($b['status'] === 'confirmed' && $isPaid && $today >= $b['checkin_date'] && $today <= $b['checkout_date']);
               $needsVerify = ($b['status'] === 'confirmed' && $payStatus === 'Paid (Under Verification)');
 
@@ -598,6 +604,14 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
       if (result.status === 'success') {
         showBanner(result.message, 'success');
         const row = link.closest('tr');
+
+        // Dynamically update Gross Revenue KPI card if new_revenue is returned
+        if (result.new_revenue) {
+          const revEl = document.getElementById('kpiGrossRevenue');
+          if (revEl) {
+            revEl.innerHTML = '&#8369;' + result.new_revenue;
+          }
+        }
 
         // 1. Confirm Payment UI update: Transitions Guest to Paid & In-House
         if (href.includes('action=confirm-payment')) {
