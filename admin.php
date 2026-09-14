@@ -15,14 +15,14 @@ $pdo = getConnection();
 $today = date('Y-m-d');
 
 // 1. Fetch dashboard overview stats
-$revStmt = $pdo->query("SELECT COALESCE(SUM(total_amount), 0) AS total_rev FROM bookings WHERE status = 'confirmed'");
+$revStmt = $pdo->query("SELECT COALESCE(SUM(total_amount), 0) AS total_rev FROM bookings WHERE status IN ('confirmed', 'completed')");
 $totalRevenue = (float)$revStmt->fetchColumn();
 
 $activeStmt = $pdo->prepare("SELECT COUNT(*) FROM bookings WHERE status = 'confirmed' AND :today BETWEEN checkin_date AND checkout_date");
 $activeStmt->execute([':today' => $today]);
 $activeStays = (int)$activeStmt->fetchColumn();
 
-$confirmedCountStmt = $pdo->query("SELECT COUNT(*) FROM bookings WHERE status = 'confirmed'");
+$confirmedCountStmt = $pdo->query("SELECT COUNT(*) FROM bookings WHERE status IN ('confirmed', 'completed')");
 $totalBookings = (int)$confirmedCountStmt->fetchColumn();
 
 $ratingStmt = $pdo->query("SELECT AVG(rating) AS avg_score, COUNT(*) AS count FROM reviews");
@@ -100,7 +100,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
     <div class="kpi-card">
       <span class="kpi-label">Gross Revenue</span>
       <div class="kpi-number">&#8369;<?= number_format($totalRevenue, 2) ?></div>
-      <small>Confirmed reservations</small>
+      <small>Confirmed &amp; completed stays</small>
     </div>
     <div class="kpi-card">
       <span class="kpi-label">Occupancy Rate</span>
@@ -156,12 +156,18 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
       <?php else: ?>
         <div class="ops-list">
           <?php foreach ($departures as $dep): ?>
-            <div class="ops-item">
+            <div class="ops-item" id="dep-item-<?= $dep['id'] ?>">
               <div>
                 <strong><?= htmlspecialchars($dep['guest_name']) ?></strong>
                 <small><?= htmlspecialchars($dep['room_name']) ?> &bull; #EVR-<?= str_pad($dep['id'], 5, '0', STR_PAD_LEFT) ?></small>
               </div>
-              <span class="badge" style="background: var(--warm-gold); color: #fff;">Check Out</span>
+              <!-- Clickable Check-Out Action Button -->
+              <a href="function.php?action=checkout-booking&id=<?= $dep['id'] ?>" 
+                 class="btn btn-gold btn-sm btn-ops-checkout" 
+                 style="font-size: 0.68rem; padding: 0.3rem 0.65rem;"
+                 onclick="return confirm('Complete check-out for <?= htmlspecialchars(addslashes($dep['guest_name'])) ?>?');">
+                Check Out
+              </a>
             </div>
           <?php endforeach; ?>
         </div>
@@ -212,7 +218,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
         <tbody>
           <?php foreach ($bookings as $b): ?>
             <?php 
-              $isPastStay = ($b['checkout_date'] < $today);
+              $isPastStay = ($b['checkout_date'] < $today || $b['status'] === 'completed');
               $isArrivingToday = ($b['checkin_date'] === $today && $b['status'] === 'confirmed');
               $isInHouse = ($b['status'] === 'confirmed' && $today >= $b['checkin_date'] && $today <= $b['checkout_date']);
               $payStatus = $b['payment_status'] ?? 'Pending (Due at Check-in)';
@@ -223,7 +229,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
               if ($needsVerify) $filterTags[] = 'verify';
               if ($isArrivingToday) $filterTags[] = 'today';
               if ($isInHouse) $filterTags[] = 'inhouse';
-              if ($isPastStay && $b['status'] === 'confirmed') $filterTags[] = 'completed';
+              if ($isPastStay) $filterTags[] = 'completed';
               if ($b['status'] === 'cancelled') $filterTags[] = 'cancelled';
             ?>
             <tr data-filter="<?= implode(' ', $filterTags) ?>" data-booking-id="<?= $b['id'] ?>">
@@ -286,23 +292,13 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
                   </a>
                 <?php endif; ?>
 
-                <!-- Early Check-Out Button for Active In-House Stays -->
-                <?php if ($isInHouse && $b['checkout_date'] > $today): ?>
-                  <a href="function.php?action=early-checkout&id=<?= $b['id'] ?>" 
-                     class="btn btn-sage btn-sm btn-early-checkout" 
-                     style="padding: 0.32rem 0.5rem; font-size: 0.66rem; margin-right: 3px;"
-                     onclick="return confirm('Process early check-out for this guest? This will release the room for new bookings starting today.');">
-                    Check Out
-                  </a>
-                <?php endif; ?>
-
                 <?php if ($b['status'] === 'confirmed' && !$isPastStay): ?>
                   <a href="function.php?action=cancel-booking&id=<?= $b['id'] ?>" 
                      class="btn-action-cancel" 
                      onclick="return confirm('Cancel this reservation? This reopens the dates immediately.');">
                     Cancel
                   </a>
-                <?php elseif ($isPastStay && $b['status'] === 'confirmed'): ?>
+                <?php elseif ($isPastStay && $b['status'] !== 'cancelled'): ?>
                   <span style="color: var(--gray); font-size: 0.72rem;">Completed</span>
                 <?php else: ?>
                   <span style="color: var(--gray); font-size: 0.72rem;">None</span>
@@ -533,7 +529,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
     if (alert) alert.style.display = 'none';
   }
 
-  // Intercept Admin Clicks (Mark Paid, Early Checkout, Cancel, Toggle Room, Delete Review) without reload or double popups
+  // Intercept Admin Clicks (Mark Paid, Operations Check Out, Cancel, Toggle Room, Delete Review) without reload
   document.addEventListener('click', async function(e) {
     const link = e.target.closest('a[href*="function.php?action="]');
     if (!link) return;
@@ -555,7 +551,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
         showBanner(result.message, 'success');
         const row = link.closest('tr');
 
-        // Confirm Payment UI update
+        // 1. Confirm Payment UI update
         if (href.includes('action=confirm-payment')) {
           link.remove();
           closeProofModal();
@@ -581,34 +577,37 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
           }
         }
 
-        // Early Check-Out UI update
-        if (href.includes('action=early-checkout')) {
-          link.remove();
-          if (row) {
-            const statusCell = row.querySelector('td:nth-child(7)');
-            if (statusCell) statusCell.innerHTML = '<span class="badge badge-completed">completed</span>';
-            row.setAttribute('data-filter', 'all completed');
+        // 2. Expected Departures Check Out UI update
+        if (href.includes('action=checkout-booking') || href.includes('action=early-checkout')) {
+          const opsItem = link.closest('.ops-item');
+          if (opsItem) {
+            link.outerHTML = '<span class="badge badge-completed">Departed</span>';
+          }
 
-            // Remove cancel button if still present
-            const cancelBtn = row.querySelector('.btn-action-cancel');
+          const bookingIdMatch = href.match(/id=(\d+)/);
+          const targetRow = bookingIdMatch ? document.querySelector(`tr[data-booking-id="${bookingIdMatch[1]}"]`) : null;
+
+          if (targetRow) {
+            const statusCell = targetRow.querySelector('td:nth-child(7)');
+            if (statusCell) statusCell.innerHTML = '<span class="badge badge-completed">completed</span>';
+            targetRow.setAttribute('data-filter', 'all completed');
+
+            const cancelBtn = targetRow.querySelector('.btn-action-cancel');
             if (cancelBtn) cancelBtn.remove();
           }
         }
 
-        // Cancel Reservation UI update
+        // 3. Cancel Reservation UI update
         if (href.includes('action=cancel-booking')) {
           link.remove();
           if (row) {
             const statusCell = row.querySelector('td:nth-child(7)');
             if (statusCell) statusCell.innerHTML = '<span class="badge badge-cancelled">cancelled</span>';
             row.setAttribute('data-filter', 'all cancelled');
-
-            const checkoutBtn = row.querySelector('.btn-early-checkout');
-            if (checkoutBtn) checkoutBtn.remove();
           }
         }
 
-        // Toggle Room Availability UI update
+        // 4. Toggle Room Availability UI update
         if (href.includes('action=toggle-room-status')) {
           if (row) {
             const statusBadge = row.querySelector('td:nth-child(3) .badge');
@@ -628,7 +627,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
           }
         }
 
-        // Delete Review UI update
+        // 5. Delete Review UI update
         if (href.includes('action=delete-review')) {
           if (row) row.remove();
         }

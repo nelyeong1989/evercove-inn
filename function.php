@@ -406,7 +406,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'cancel-booking') {
             $stmt->execute([':id' => $bookingId]);
 
             if ($stmt->rowCount() > 0) {
-                sendResponse('success', 'Booking #EVR-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT) . ' marked as cancelled. Dates reopened.');
+                sendResponse('success', 'Booking #EVR-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT) . ' marked as cancelled. Room reopened.');
             } else {
                 sendResponse('error', 'Past completed stays cannot be cancelled.');
             }
@@ -418,8 +418,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'cancel-booking') {
     sendResponse('error', 'Invalid booking identifier.');
 }
 
-// 7.1 Admin Early Check-Out (Frees up room starting today - AJAX Aware)
-if (isset($_GET['action']) && $_GET['action'] === 'early-checkout') {
+// 7.1 Admin Check-Out / Early Check-Out (Frees up room starting today - AJAX Aware)
+if (isset($_GET['action']) && in_array($_GET['action'], ['checkout-booking', 'early-checkout'], true)) {
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
         sendResponse('error', 'Unauthorized access.', 'login.php');
     }
@@ -439,25 +439,37 @@ if (isset($_GET['action']) && $_GET['action'] === 'early-checkout') {
             $stmt->execute([':id' => $bookingId]);
             $b = $stmt->fetch();
 
-            if ($b && $b['checkin_date'] <= $today && $b['checkout_date'] > $today) {
-                $nights = max(1, (int)((strtotime($today) - strtotime($b['checkin_date'])) / 86400));
-                $newTotal = $nights * (float)$b['price_per_night'];
+            if ($b) {
+                if ($b['checkin_date'] > $today) {
+                    sendResponse('error', 'Guest has not checked in yet.');
+                }
 
-                $upd = $pdo->prepare("
-                    UPDATE bookings 
-                    SET checkout_date = :today,
-                        total_amount = :total
-                    WHERE id = :id
-                ");
-                $upd->execute([
-                    ':today' => $today,
-                    ':total' => $newTotal,
-                    ':id'    => $bookingId
-                ]);
+                // If early departure before scheduled checkout, adjust checkout date and recalculate total
+                if ($b['checkout_date'] > $today) {
+                    $nights = max(1, (int)((strtotime($today) - strtotime($b['checkin_date'])) / 86400));
+                    $newTotal = $nights * (float)$b['price_per_night'];
 
-                sendResponse('success', 'Early check-out recorded. Room is now available for new bookings.');
+                    $upd = $pdo->prepare("
+                        UPDATE bookings 
+                        SET checkout_date = :today,
+                            total_amount = :total,
+                            status = 'completed'
+                        WHERE id = :id
+                    ");
+                    $upd->execute([
+                        ':today' => $today,
+                        ':total' => $newTotal,
+                        ':id'    => $bookingId
+                    ]);
+                } else {
+                    // Scheduled departure today
+                    $upd = $pdo->prepare("UPDATE bookings SET status = 'completed' WHERE id = :id");
+                    $upd->execute([':id' => $bookingId]);
+                }
+
+                sendResponse('success', 'Guest checked out successfully. Room is now available.');
             } else {
-                sendResponse('error', 'This reservation is not currently active.');
+                sendResponse('error', 'Reservation not found or already completed/cancelled.');
             }
         } catch (PDOException $e) {
             sendResponse('error', $e->getMessage());
