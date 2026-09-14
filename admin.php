@@ -275,7 +275,6 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
               $isPaid = in_array($payStatus, ['Paid (Online)', 'Paid (Verified)', 'Paid (Front Desk)'], true);
               $isPastStay = ($b['checkout_date'] < $today || $b['status'] === 'completed');
               $isArrivingToday = ($b['checkin_date'] === $today && $b['status'] === 'confirmed');
-              // STRICT: In-House stays require payment settlement
               $isInHouse = ($b['status'] === 'confirmed' && $isPaid && $today >= $b['checkin_date'] && $today <= $b['checkout_date']);
               $needsVerify = ($b['status'] === 'confirmed' && $payStatus === 'Paid (Under Verification)');
 
@@ -319,7 +318,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
                 <?php endif; ?>
                 <?php if (!empty($b['payment_proof'])): ?>
                   <a href="javascript:void(0)" 
-                     onclick="openProofModal('<?= htmlspecialchars($b['payment_proof']) ?>', '#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?>', '<?= htmlspecialchars($b['payment_ref'] ?? 'N/A') ?>', <?= $b['id'] ?>, <?= $isPaid ? 'true' : 'false' ?>)" 
+                     onclick="openProofModal('<?= htmlspecialchars($b['payment_proof']) ?>', '#EVR-<?= str_pad($b['id'], 5, '0', STR_PAD_LEFT) ?>', '<?= htmlspecialchars($b['payment_ref'] ?? 'N/A') ?>')" 
                      style="display: inline-block; font-size: 0.66rem; font-weight: 700; color: var(--gold-dark); text-decoration: underline; margin-top: 2px; white-space: nowrap;">
                     🔍 Screenshot
                   </a>
@@ -483,7 +482,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
 
 </div>
 
-<!-- In-App Payment Proof Lightbox Modal -->
+<!-- In-App Payment Proof Lightbox Modal (Cleaned: Mark Paid removed) -->
 <div id="proofModal" class="modal-backdrop">
   <div class="modal-box">
     <div class="modal-head">
@@ -497,10 +496,8 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
       <img id="modalProofImg" src="" alt="Payment Receipt Proof">
     </div>
     <div class="modal-footer" id="modalFooterActions">
-      <a href="" id="modalMarkPaidBtn" class="btn btn-green btn-sm" onclick="return confirm('Confirm verified payment for this reservation?');">
-        Confirm &amp; Mark Paid
-      </a>
-      <a href="" id="modalOpenTabBtn" target="_blank" class="btn btn-sage btn-sm">Open Full Image</a>
+      <button type="button" class="btn btn-sage btn-sm" onclick="closeProofModal()">Close</button>
+      <a href="" id="modalOpenTabBtn" target="_blank" class="btn btn-green btn-sm">Open Full Image</a>
     </div>
   </div>
 </div>
@@ -534,20 +531,11 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
     });
   }
 
-  function openProofModal(imgSrc, bookingRef, payRef, bookingId, isPaid) {
+  function openProofModal(imgSrc, bookingRef, payRef) {
     document.getElementById('modalProofImg').src = imgSrc;
     document.getElementById('modalBookingRef').textContent = 'Audit Proof: ' + bookingRef;
     document.getElementById('modalPayRef').textContent = 'Transaction Ref: ' + payRef;
     document.getElementById('modalOpenTabBtn').href = imgSrc;
-
-    const markPaidBtn = document.getElementById('modalMarkPaidBtn');
-    if (isPaid) {
-      markPaidBtn.style.display = 'none';
-    } else {
-      markPaidBtn.style.display = 'inline-flex';
-      markPaidBtn.href = 'function.php?action=confirm-payment&id=' + bookingId;
-    }
-
     document.getElementById('proofModal').classList.add('active');
   }
 
@@ -605,7 +593,7 @@ $reviews = $pdo->query("SELECT * FROM reviews ORDER BY id DESC")->fetchAll();
         showBanner(result.message, 'success');
         const row = link.closest('tr');
 
-        // Dynamically update Gross Revenue KPI card if new_revenue is returned
+        // Dynamically update Gross Revenue KPI card
         if (result.new_revenue) {
           const revEl = document.getElementById('kpiGrossRevenue');
           if (revEl) {
