@@ -326,7 +326,7 @@ if (isset($_POST['book-stay'])) {
     }
 }
 
-// 5. Update Existing Reservation
+// 5. Update Existing Reservation (Requires updated payment screenshot)
 if (isset($_POST['update-booking'])) {
     if (!isset($_SESSION['user_id'])) {
         header('Location: login.php');
@@ -356,7 +356,7 @@ if (isset($_POST['update-booking'])) {
     try {
         $pdo = getConnection();
 
-        $chk = $pdo->prepare("SELECT id, checkin_date FROM bookings WHERE id = :id AND user_id = :uid AND status = 'confirmed'");
+        $chk = $pdo->prepare("SELECT id, checkin_date, payment_method, payment_proof FROM bookings WHERE id = :id AND user_id = :uid AND status = 'confirmed'");
         $chk->execute([':id' => $bookingId, ':uid' => $_SESSION['user_id']]);
         $existingBooking = $chk->fetch();
 
@@ -404,29 +404,72 @@ if (isset($_POST['update-booking'])) {
             exit;
         }
 
+        // Process mandatory updated payment proof screenshot
+        $fileUpload = $_FILES['payment_proof'] ?? null;
+        $newProofPath = null;
+
+        if ($fileUpload && $fileUpload['error'] === UPLOAD_ERR_OK) {
+            $allowedExts = ['jpg', 'jpeg', 'png', 'webp'];
+            $fileInfo    = pathinfo($fileUpload['name']);
+            $extension   = strtolower($fileInfo['extension'] ?? '');
+
+            if (!in_array($extension, $allowedExts, true)) {
+                header('Location: edit-booking.php?id=' . $bookingId . '&status=error&message=' . urlencode('Payment proof must be an image (JPG, PNG, or WEBP).'));
+                exit;
+            }
+
+            $uploadDir = __DIR__ . '/uploads/payments/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+
+            $newFileName  = 'proof_' . date('Ymd_His') . '_' . uniqid() . '.' . $extension;
+            $targetPath   = $uploadDir . $newFileName;
+
+            if (move_uploaded_file($fileUpload['tmp_name'], $targetPath)) {
+                $newProofPath = 'uploads/payments/' . $newFileName;
+            }
+        } else {
+            header('Location: edit-booking.php?id=' . $bookingId . '&status=error&message=' . urlencode('Please upload an updated payment proof screenshot for your modified reservation.'));
+            exit;
+        }
+
         $nights = (strtotime($result['data']['checkout']) - strtotime($result['data']['checkin'])) / 86400;
         $total  = $nights * (float) $room['price_per_night'];
 
+        $rawPayment = trim($_POST['payment_method'] ?? ($existingBooking['payment_method'] ?? 'GCash (Online)'));
+        $validMethods = ['Pay on Check-in', 'GCash (Online)', 'Card (Online)'];
+        $paymentMethod = in_array($rawPayment, $validMethods, true) ? $rawPayment : 'GCash (Online)';
+        $paymentRef = trim($_POST['payment_ref'] ?? '');
+
+        // Update booking and reset payment_status to 'Paid (Under Verification)'
         $upd = $pdo->prepare("
             UPDATE bookings 
             SET room_id = :rid, 
                 checkin_date = :cin, 
                 checkout_date = :cout, 
                 guests_count = :guests, 
-                total_amount = :total 
+                total_amount = :total,
+                payment_method = :pay_method,
+                payment_ref = :pay_ref,
+                payment_proof = :pay_proof,
+                payment_status = 'Paid (Under Verification)'
             WHERE id = :bid AND user_id = :uid
         ");
         $upd->execute([
-            ':rid'    => $result['data']['room_id'],
-            ':cin'    => $result['data']['checkin'],
-            ':cout'   => $result['data']['checkout'],
-            ':guests' => $result['data']['guests'],
-            ':total'  => $total,
-            ':bid'    => $bookingId,
-            ':uid'    => $_SESSION['user_id'],
+            ':rid'        => $result['data']['room_id'],
+            ':cin'        => $result['data']['checkin'],
+            ':cout'       => $result['data']['checkout'],
+            ':guests'     => $result['data']['guests'],
+            ':total'      => $total,
+            ':pay_method' => $paymentMethod,
+            ':pay_ref'    => $paymentRef,
+            ':pay_proof'  => $newProofPath,
+            ':bid'        => $bookingId,
+            ':uid'        => $_SESSION['user_id'],
         ]);
 
-        header('Location: my-bookings.php?status=success&message=' . urlencode('Reservation #EVR-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT) . ' updated successfully!'));
+        header('Location: my-bookings.php?status=success&message=' . urlencode('Reservation #EVR-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT) . ' updated! New payment proof submitted for staff verification.'));
         exit;
     } catch (PDOException $e) {
         header('Location: edit-booking.php?id=' . $bookingId . '&status=error&message=' . urlencode($e->getMessage()));

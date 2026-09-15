@@ -78,11 +78,11 @@ $rooms = $pdo->query("SELECT * FROM rooms ORDER BY id ASC")->fetchAll();
         Reservation #EVR-<?= str_pad($booking['id'], 5, '0', STR_PAD_LEFT) ?>
       </h2>
       <p style="color: var(--gray); font-size: 0.95rem; margin-top: 0.4rem;">
-        Change your room selection, stay dates, or party size below.
+        Update your room, dates, or party size, and upload updated payment proof.
       </p>
     </div>
 
-    <form method="POST" action="function.php">
+    <form method="POST" action="function.php" enctype="multipart/form-data">
       <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
 
       <div class="booking-form-grid">
@@ -114,6 +114,34 @@ $rooms = $pdo->query("SELECT * FROM rooms ORDER BY id ASC")->fetchAll();
           <label for="guests" id="guest-label">Number of Guests</label>
           <input type="number" id="guests" name="guests" value="<?= htmlspecialchars($booking['guests_count']) ?>" min="1" max="6" required>
         </div>
+
+        <!-- Payment Method Selection -->
+        <div class="booking-input-group">
+          <label for="payment_method">Payment Method</label>
+          <select id="payment_method" name="payment_method" required>
+            <option value="GCash (Online)" <?= ($booking['payment_method'] === 'GCash (Online)') ? 'selected' : '' ?>>GCash (Online)</option>
+            <option value="Card (Online)" <?= ($booking['payment_method'] === 'Card (Online)') ? 'selected' : '' ?>>Card / Bank Transfer</option>
+            <option value="Pay on Check-in" <?= ($booking['payment_method'] === 'Pay on Check-in') ? 'selected' : '' ?>>Pay on Check-in</option>
+          </select>
+        </div>
+
+        <!-- Payment Reference Number -->
+        <div class="booking-input-group">
+          <label for="payment_ref">Payment Reference Number</label>
+          <input type="text" id="payment_ref" name="payment_ref" value="<?= htmlspecialchars($booking['payment_ref'] ?? '') ?>" placeholder="e.g. 901234567890">
+        </div>
+
+        <!-- Mandatory Screenshot Upload on Modification -->
+        <div class="booking-input-group full-width proof-upload-zone" style="margin-top: 0.5rem;">
+          <label for="payment_proof">Upload Updated Payment Screenshot *</label>
+          <?php if (!empty($booking['payment_proof'])): ?>
+            <small style="display: block; margin-bottom: 0.5rem; color: var(--gray); font-size: 0.76rem;">
+              Current file on record: <a href="<?= htmlspecialchars($booking['payment_proof']) ?>" target="_blank" style="color: var(--gold-dark); text-decoration: underline; font-weight: 600;">View previous receipt</a>
+            </small>
+          <?php endif; ?>
+          <input type="file" id="payment_proof" name="payment_proof" class="file-input-custom" accept="image/png, image/jpeg, image/jpg, image/webp" required onchange="previewImage(this, 'preview-edit-proof')">
+          <img id="preview-edit-proof" class="preview-thumbnail" alt="Updated Receipt Preview">
+        </div>
       </div>
 
       <div style="display: flex; gap: 1rem; margin-top: 2rem;">
@@ -138,6 +166,20 @@ $rooms = $pdo->query("SELECT * FROM rooms ORDER BY id ASC")->fetchAll();
 </footer>
 
 <script>
+  function previewImage(input, previewId) {
+    const preview = document.getElementById(previewId);
+    if (input.files && input.files[0]) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        preview.src = e.target.result;
+        preview.style.display = 'block';
+      };
+      reader.readAsDataURL(input.files[0]);
+    } else {
+      preview.style.display = 'none';
+    }
+  }
+
   function updateGuestLimit() {
     const roomSelect = document.getElementById('room_id');
     const guestInput = document.getElementById('guests');
